@@ -19,7 +19,6 @@ export interface ButtonProps {
   disabled?: boolean;
   icon?: React.ReactNode;
   fullWidth?: boolean;
-  /** Custom style override */
   style?: ViewStyle;
 }
 
@@ -36,13 +35,11 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const { colors, spacing, borderRadius, shadows, layout, typography } = useTheme();
 
-  // Button height based on size
   const buttonHeight =
     size === 'small' ? layout.buttonHeightSmall :
     size === 'large' ? layout.buttonHeight + 8 :
     layout.buttonHeight;
 
-  // Font size based on size
   const fontSize =
     size === 'small' ? typography.sizes.sm :
     size === 'large' ? typography.sizes.lg :
@@ -54,12 +51,12 @@ export const Button: React.FC<ButtonProps> = ({
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      borderRadius: variant === 'primary' ? borderRadius.none : borderRadius.md,
+      borderRadius: borderRadius.md,
       paddingHorizontal: size === 'small' ? spacing.md : spacing.xl,
       ...(fullWidth && { width: '100%' }),
       ...(variant === 'primary' && {
         backgroundColor: colors.primary,
-        ...shadows.primaryButton,
+        ...shadows.medium,
       }),
       ...(variant === 'secondary' && {
         backgroundColor: colors.accent,
@@ -67,7 +64,7 @@ export const Button: React.FC<ButtonProps> = ({
       }),
       ...(variant === 'outline' && {
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: colors.primary,
       }),
       ...(variant === 'danger' && {
