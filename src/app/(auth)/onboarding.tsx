@@ -43,6 +43,7 @@ const slides: OnboardingSlide[] = [
     id: '3',
     title: 'Safe & Secure',
     description: 'Pay with cash, transfer, or card. Your safety is our priority',
+    // Todo: download and add the correct illustration
     image: require('@/assets/illustrations/onboarding-3.svg'),
   },
 ];
