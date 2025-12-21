@@ -8,7 +8,7 @@ import {
   setupPIN,
 } from '@/services/securityService';
 import { showError, showSuccess } from '@/utils/toast';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Fingerprint } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -24,6 +24,9 @@ type SetupStep = 'create' | 'confirm' | 'biometric';
 
 export default function PINSetupScreen() {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const params = useLocalSearchParams();
+  const isReset = params.isReset === 'true';
+  
   const [currentStep, setCurrentStep] = useState<SetupStep>('create');
   const [firstPin, setFirstPin] = useState('');
   const [error, setError] = useState(false);
@@ -59,8 +62,10 @@ export default function PINSetupScreen() {
         return;
       }
 
-      // Mark device as known
-      await markDeviceAsKnown();
+      // Mark device as known (only for new setup, not reset)
+      if (!isReset) {
+        await markDeviceAsKnown();
+      }
 
       // Check biometric availability
       const biometric = await getBiometricCapability();
@@ -97,18 +102,32 @@ export default function PINSetupScreen() {
   };
 
   const completeSetup = () => {
-    showSuccess('Account Created', 'Your account has been set up successfully');
+    const successMessage = isReset 
+      ? 'PIN Reset Successfully' 
+      : 'Account Created';
+    const successDescription = isReset
+      ? 'Your PIN has been reset successfully'
+      : 'Your account has been set up successfully';
     
-    // Navigate based on user type
-    // TODO: Get user type from Firestore and navigate appropriately
-    // For now, navigate to welcome (will be updated when home screens are created)
-    // Passenger → /(passenger)
-    // Driver → /(driver) 
-    // Admin → /(admin)
-    router.replace('/(auth)/welcome'); 
+    showSuccess(successMessage, successDescription);
+    
+    if (isReset) {
+      // For reset, go back to login
+      router.replace('/(auth)/login');
+    } else {
+      // For new setup, navigate based on user type
+      // TODO: Get user type from Firestore and navigate appropriately
+      // Passenger → /(passenger)
+      // Driver → /(driver) 
+      // Admin → /(admin)
+      router.replace('/(auth)/welcome'); 
+    }
   };
 
   const getTitle = () => {
+    if (isReset) {
+      return currentStep === 'create' ? 'Reset Your PIN' : 'Confirm New PIN';
+    }
     switch (currentStep) {
       case 'create':
         return 'Create Your PIN';
@@ -120,6 +139,11 @@ export default function PINSetupScreen() {
   };
 
   const getSubtitle = () => {
+    if (isReset) {
+      return currentStep === 'create' 
+        ? 'Choose a new 6-digit PIN'
+        : 'Enter your new PIN again to confirm';
+    }
     switch (currentStep) {
       case 'create':
         return 'Choose a 6-digit PIN to secure your account';
@@ -226,21 +250,23 @@ export default function PINSetupScreen() {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          {/* Progress Indicator */}
-          <View style={styles.progressContainer}>
-            <View
-              style={[
-                styles.progressDot,
-                currentStep === 'create' && styles.progressDotActive,
-              ]}
-            />
-            <View
-              style={[
-                styles.progressDot,
-                currentStep === 'confirm' && styles.progressDotActive,
-              ]}
-            />
-          </View>
+          {/* Progress Indicator - only show for new setup */}
+          {!isReset && (
+            <View style={styles.progressContainer}>
+              <View
+                style={[
+                  styles.progressDot,
+                  currentStep === 'create' && styles.progressDotActive,
+                ]}
+              />
+              <View
+                style={[
+                  styles.progressDot,
+                  currentStep === 'confirm' && styles.progressDotActive,
+                ]}
+              />
+            </View>
+          )}
 
           <Text style={styles.title}>{getTitle()}</Text>
           <Text style={styles.subtitle}>{getSubtitle()}</Text>

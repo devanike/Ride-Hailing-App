@@ -1,5 +1,3 @@
-// src/app/(auth)/otp-verification.tsx
-
 import { Button } from '@/components/common/Button';
 import { useTheme } from '@/hooks/useTheme';
 import { sendPhoneOTP, verifyOTP } from '@/services/authService';
@@ -23,7 +21,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function OTPVerificationScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
   const params = useLocalSearchParams();
-  const { name, phone, userType } = params as { name: string; phone: string; userType: 'passenger' | 'driver' };
+  const { name, phone, userType, isLogin } = params as { 
+    name?: string; 
+    phone: string; 
+    userType?: 'passenger' | 'driver';
+    isLogin?: string;
+  };
+
+  const isLoginMode = isLogin === 'true';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -98,7 +103,16 @@ export default function OTPVerificationScreen() {
       const userCredential = await verifyOTP(confirmationResult, otpCode);
       const uid = userCredential.user.uid;
 
-      // Create user document in Firestore
+      if (isLoginMode) {
+        // Login mode - just verify and navigate
+        showSuccess('Success', 'Login successful');
+        
+        // TODO: Navigate based on user type
+        router.replace('/(auth)/welcome'); // Temporary
+        return;
+      }
+
+      // Signup mode - create user documents
       await setDoc(doc(db, 'users', uid), {
         uid,
         name,
