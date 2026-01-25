@@ -24,6 +24,7 @@
     "@react-navigation/stack": "^7.6.12",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
     "expo": "~54.0.29",
     "expo-constants": "~18.0.12",
     "expo-crypto": "~15.0.8",

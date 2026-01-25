@@ -35,13 +35,15 @@ export interface MapMarker {
   icon?: React.ReactNode;
 }
 
-export enum MarkerType {
-  USER = 'user',
-  DRIVER = 'driver',
-  PICKUP = 'pickup',
-  DROPOFF = 'dropoff',
-  CAMPUS_LOCATION = 'campus_location',
-}
+export type MarkerType = 'user' | 'driver' | 'pickup' | 'dropoff' | 'campus_location';
+
+// export enum MarkerType {
+//   USER = 'user',
+//   DRIVER = 'driver',
+//   PICKUP = 'pickup',
+//   DROPOFF = 'dropoff',
+//   CAMPUS_LOCATION = 'campus_location',
+// }
 
 export interface RouteCoordinates {
   pickup: Coordinates;
