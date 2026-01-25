@@ -6,11 +6,10 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
-  Image,
   StatusBar,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -110,12 +109,12 @@ export default function WelcomeScreen() {
         </View>
 
         {/* Middle Section - Main Illustration (Image 1) */}
-        <View style={styles.middleSection}>
+        {/* <View style={styles.middleSection}>
           <Image
             source={require('@/assets/illustrations/welcome.png')}
             style={styles.illustration}
           />
-        </View>
+        </View> */}
 
         {/* Bottom Section - Action Buttons */}
         <View style={styles.bottomSection}>

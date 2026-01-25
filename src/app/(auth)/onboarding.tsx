@@ -1,11 +1,14 @@
 import { Button } from '@/components/common/Button';
 import { useTheme } from '@/hooks/useTheme';
+import { showError } from '@/utils/toast';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
   Image,
+  ImageSourcePropType,
   StatusBar,
   StyleSheet,
   Text,
@@ -21,12 +24,17 @@ interface OnboardingSlide {
   id: string;
   title: string;
   description: string;
-  image: any;
+  image: ImageSourcePropType;
 }
 
-const ONBOARDING_KEY = '@onboarding_completed';
+interface ViewableItemsChanged {
+  viewableItems: ViewToken[];
+  changed: ViewToken[];
+}
 
-const slides: OnboardingSlide[] = [
+const ONBOARDING_KEY = '@onboarding_completed' as const;
+
+const slides: readonly OnboardingSlide[] = [
   {
     id: '1',
     title: 'Find Your Ride',
@@ -38,25 +46,25 @@ const slides: OnboardingSlide[] = [
     title: 'Track in Real-Time',
     description: 'Know exactly where your driver is and get accurate arrival times',
     image: require('@/assets/illustrations/onboarding-2.svg'),
-  },
-  {
-    id: '3',
-    title: 'Safe & Secure',
-    description: 'Pay with cash, transfer, or card. Your safety is our priority',
-    // Todo: download and add the correct illustration
-    image: require('@/assets/illustrations/onboarding-3.svg'),
-  },
-];
+  }
+  // {
+  //   id: '3',
+  //   title: 'Safe & Secure',
+  //   description: 'Pay with cash, transfer, or card. Your safety is our priority',
+  //   image: require('@/assets/illustrations/onboarding-3.svg'),
+  // },
+] as const;
 
-export default function OnboardingScreen() {
+export default function OnboardingScreen(): React.JSX.Element {
   const { colors, typography, spacing, borderRadius } = useTheme();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+  const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0) {
-        setCurrentIndex(viewableItems[0].index || 0);
+    ({ viewableItems }: ViewableItemsChanged): void => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setCurrentIndex(viewableItems[0].index);
       }
     }
   ).current;
@@ -65,7 +73,27 @@ export default function OnboardingScreen() {
     itemVisiblePercentThreshold: 50,
   }).current;
 
-  const handleNext = () => {
+  const handleGetStarted = useCallback(async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      
+      // Add small delay for better UX
+      setTimeout(() => {
+        router.replace('/(auth)/welcome');
+      }, 200);
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to complete setup';
+      showError('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleNext = useCallback((): void => {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -74,21 +102,29 @@ export default function OnboardingScreen() {
     } else {
       handleGetStarted();
     }
-  };
+  }, [currentIndex, handleGetStarted]);
 
-  const handleSkip = async () => {
-    // TODO: uncomment this when I'm satisfied with the onboarding design
-    // await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    router.replace('/(auth)/welcome');
-  };
+  const handleSkip = useCallback(async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      
+      // Add small delay for better UX
+      setTimeout(() => {
+        router.replace('/(auth)/welcome');
+      }, 200);
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to save progress';
+      showError('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleGetStarted = async () => {
-    // TODO: uncomment this when I'm satisfied with the onboarding design
-    // await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    router.replace('/(auth)/welcome');
-  };
-
-  const renderSlide = ({ item }: { item: OnboardingSlide }) => {
+  const renderSlide = useCallback(({ item }: { item: OnboardingSlide }): React.JSX.Element => {
     const styles = StyleSheet.create({
       slide: {
         width,
@@ -127,7 +163,7 @@ export default function OnboardingScreen() {
         <Text style={styles.description}>{item.description}</Text>
       </View>
     );
-  };
+  }, [colors, typography, spacing]);
 
   const styles = StyleSheet.create({
     container: {
@@ -177,7 +213,11 @@ export default function OnboardingScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* Skip Button */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+      <TouchableOpacity 
+        style={styles.skipButton} 
+        onPress={handleSkip}
+        disabled={loading}
+      >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
@@ -189,10 +229,11 @@ export default function OnboardingScreen() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item): string => item.id}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         bounces={false}
+        scrollEnabled={!loading}
       />
 
       {/* Pagination Dots */}
@@ -213,6 +254,8 @@ export default function OnboardingScreen() {
           variant="primary"
           size="large"
           fullWidth
+          loading={loading}
+          disabled={loading}
         />
       </View>
     </SafeAreaView>

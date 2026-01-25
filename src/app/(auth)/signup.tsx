@@ -114,6 +114,27 @@ export default function SignupScreen() {
       color: colors.text.secondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
+    // Testing helper banner
+    testingBanner: {
+      backgroundColor: colors.status.infoLight,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.lg,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.status.info,
+    },
+    testingTitle: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.status.info,
+      marginBottom: spacing.xs,
+    },
+    testingText: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.text.secondary,
+      lineHeight: typography.sizes.xs * typography.lineHeights.normal,
+    },
     form: {
       marginBottom: spacing.xl,
     },
@@ -195,6 +216,16 @@ export default function SignupScreen() {
               Sign up to start booking rides across UI campus
             </Text>
           </View>
+
+          {/* Testing Helper Banner */}
+          {/* {__DEV__ && (
+            <View style={styles.testingBanner}>
+              <Text style={styles.testingTitle}>Development Mode</Text>
+              <Text style={styles.testingText}>
+                Use test phone numbers: 1234567890 (code: 123456) or 9876543210 (code: 654321)
+              </Text>
+            </View>
+          )} */}
 
           {/* Form */}
           <View style={styles.form}>

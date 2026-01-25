@@ -19,28 +19,78 @@ const LOCKED_UNTIL_KEY = 'locked_until';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+// Custom error class for security errors
+export class SecurityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SecurityError';
+    Object.setPrototypeOf(this, SecurityError.prototype);
+  }
+}
+
+// Type definitions
+interface BiometricCapability {
+  available: boolean;
+  type: 'fingerprint' | 'none';
+}
+
+interface DeviceInfo {
+  deviceId: string;
+  deviceName: string;
+  deviceType: 'android' | 'ios';
+}
+
 // PIN MANAGEMENT
-// Hash PIN with salt using SHA256
+/**
+ * Hash PIN with salt using SHA256
+ */
 const hashPIN = async (pin: string, salt: string): Promise<string> => {
-  const combined = pin + salt;
-  const hash = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    combined
-  );
-  return hash;
+  try {
+    const combined = pin + salt;
+    const hash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      combined
+    );
+    return hash;
+  } catch (error) {
+    console.error('Error hashing PIN:', error);
+    throw new SecurityError('Failed to secure PIN');
+  }
 };
 
-// Generate random salt
+/**
+ * Generate random salt
+ */
 const generateSalt = async (): Promise<string> => {
-  const randomBytes = await Crypto.getRandomBytesAsync(16);
-  return Array.from(randomBytes, (byte: number) => byte.toString(16).padStart(2, '0')).join('');
+  try {
+    const randomBytes = await Crypto.getRandomBytesAsync(16);
+    return Array.from(randomBytes, (byte: number) => 
+      byte.toString(16).padStart(2, '0')
+    ).join('');
+  } catch (error) {
+    console.error('Error generating salt:', error);
+    throw new SecurityError('Failed to generate security token');
+  }
 };
 
-// Set up a new PIN
+/**
+ * Set up a new PIN
+ * @param pin - 4-6 digit PIN
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if PIN is invalid or setup fails
+ */
 export const setupPIN = async (pin: string): Promise<boolean> => {
   try {
+    if (!pin || typeof pin !== 'string') {
+      throw new SecurityError('PIN is required');
+    }
+
     if (pin.length < 4 || pin.length > 6) {
-      throw new Error('PIN must be 4-6 digits');
+      throw new SecurityError('PIN must be 4-6 digits');
+    }
+
+    if (!/^\d+$/.test(pin)) {
+      throw new SecurityError('PIN must contain only numbers');
     }
 
     // Generate salt and hash PIN
@@ -55,35 +105,60 @@ export const setupPIN = async (pin: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error setting up PIN:', error);
-    return false;
+    if (error instanceof SecurityError) {
+      throw error;
+    }
+    throw new SecurityError('Failed to setup PIN. Please try again.');
   }
 };
 
-// Verify PIN
+/**
+ * Verify PIN
+ * @param pin - PIN to verify
+ * @returns Promise<boolean> - Whether PIN is correct
+ * @throws SecurityError if verification fails
+ */
 export const verifyPIN = async (pin: string): Promise<boolean> => {
   try {
+    if (!pin || typeof pin !== 'string') {
+      return false;
+    }
+
     const storedHash = await SecureStore.getItemAsync(PIN_KEY);
     const salt = await SecureStore.getItemAsync(PIN_SALT_KEY);
 
     if (!storedHash || !salt) {
-      return false;
+      throw new SecurityError('PIN not found. Please setup your PIN.');
     }
 
     const hash = await hashPIN(pin, salt);
     return hash === storedHash;
   } catch (error) {
     console.error('Error verifying PIN:', error);
-    return false;
+    if (error instanceof SecurityError) {
+      throw error;
+    }
+    throw new SecurityError('Failed to verify PIN. Please try again.');
   }
 };
 
-// Update PIN
+/**
+ * Update PIN
+ * @param currentPin - Current PIN for verification
+ * @param newPin - New PIN to set
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if current PIN is incorrect or update fails
+ */
 export const updatePIN = async (currentPin: string, newPin: string): Promise<boolean> => {
   try {
+    if (!currentPin || !newPin) {
+      throw new SecurityError('Both current and new PIN are required');
+    }
+
     // Verify current PIN first
     const isValid = await verifyPIN(currentPin);
     if (!isValid) {
-      throw new Error('Current PIN is incorrect');
+      throw new SecurityError('Current PIN is incorrect');
     }
 
     // Set up new PIN
@@ -94,11 +169,18 @@ export const updatePIN = async (currentPin: string, newPin: string): Promise<boo
     return success;
   } catch (error) {
     console.error('Error updating PIN:', error);
-    return false;
+    if (error instanceof SecurityError) {
+      throw error;
+    }
+    throw new SecurityError('Failed to update PIN. Please try again.');
   }
 };
 
-// Delete PIN
+/**
+ * Delete PIN
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if deletion fails
+ */
 export const deletePIN = async (): Promise<boolean> => {
   try {
     await SecureStore.deleteItemAsync(PIN_KEY);
@@ -107,12 +189,14 @@ export const deletePIN = async (): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting PIN:', error);
-    return false;
+    throw new SecurityError('Failed to delete PIN. Please try again.');
   }
 };
 
-
-// Check if user has PIN set up
+/**
+ * Check if user has PIN set up
+ * @returns Promise<boolean> - Whether PIN exists
+ */
 export const hasPIN = async (): Promise<boolean> => {
   try {
     const pin = await SecureStore.getItemAsync(PIN_KEY);
@@ -124,11 +208,11 @@ export const hasPIN = async (): Promise<boolean> => {
 };
 
 // BIOMETRIC AUTHENTICATION
-// Get biometric capability of device (Fingerprint only)
-export const getBiometricCapability = async (): Promise<{
-  available: boolean;
-  type: 'fingerprint' | 'none';
-}> => {
+/**
+ * Get biometric capability of device (Fingerprint only)
+ * @returns Promise<BiometricCapability>
+ */
+export const getBiometricCapability = async (): Promise<BiometricCapability> => {
   try {
     const compatible = await LocalAuthentication.hasHardwareAsync();
     const enrolled = await LocalAuthentication.isEnrolledAsync();
@@ -151,7 +235,11 @@ export const getBiometricCapability = async (): Promise<{
   }
 };
 
-// Authenticate with biometric
+/**
+ * Authenticate with biometric
+ * @returns Promise<boolean> - Whether authentication was successful
+ * @throws SecurityError if authentication fails
+ */
 export const authenticateWithBiometric = async (): Promise<boolean> => {
   try {
     const result = await LocalAuthentication.authenticateAsync({
@@ -163,33 +251,52 @@ export const authenticateWithBiometric = async (): Promise<boolean> => {
     return result.success;
   } catch (error) {
     console.error('Error authenticating with biometric:', error);
-    return false;
+    throw new SecurityError('Biometric authentication failed. Please use PIN.');
   }
 };
 
-// Enable biometric authentication
+/**
+ * Enable biometric authentication
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if biometric is not available or enable fails
+ */
 export const enableBiometric = async (): Promise<boolean> => {
   try {
+    const capability = await getBiometricCapability();
+    if (!capability.available) {
+      throw new SecurityError('Biometric authentication is not available on this device');
+    }
+
     await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
     return true;
   } catch (error) {
     console.error('Error enabling biometric:', error);
-    return false;
+    if (error instanceof SecurityError) {
+      throw error;
+    }
+    throw new SecurityError('Failed to enable biometric. Please try again.');
   }
 };
 
-// Disable biometric authentication
+/**
+ * Disable biometric authentication
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if disable fails
+ */
 export const disableBiometric = async (): Promise<boolean> => {
   try {
     await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'false');
     return true;
   } catch (error) {
     console.error('Error disabling biometric:', error);
-    return false;
+    throw new SecurityError('Failed to disable biometric. Please try again.');
   }
 };
 
-// Check if biometric is enabled
+/**
+ * Check if biometric is enabled
+ * @returns Promise<boolean> - Whether biometric is enabled
+ */
 export const isBiometricEnabled = async (): Promise<boolean> => {
   try {
     const enabled = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
@@ -201,22 +308,48 @@ export const isBiometricEnabled = async (): Promise<boolean> => {
 };
 
 // UNIFIED AUTHENTICATION
-// Authenticate user (tries biometric first, falls back to PIN)
+/**
+ * Authenticate user (tries biometric first, falls back to PIN)
+ * @param pin - Optional PIN for fallback
+ * @returns Promise<boolean> - Whether authentication was successful
+ * @throws SecurityError if account is locked or authentication fails
+ */
 export const authenticateUser = async (pin?: string): Promise<boolean> => {
   try {
     // Check if account is locked
-    const isLocked = await isAccountLocked();
-    if (isLocked) {
-      throw new Error('Account is locked due to too many failed attempts');
+    const locked = await isAccountLocked();
+    if (locked) {
+      const remainingTime = await getRemainingLockoutTime();
+      throw new SecurityError(
+        `Account is locked due to too many failed attempts. Try again in ${Math.ceil(remainingTime / 60)} minutes.`
+      );
     }
 
     // Try biometric first if enabled
     const biometricEnabled = await isBiometricEnabled();
     if (biometricEnabled) {
-      const biometricSuccess = await authenticateWithBiometric();
-      if (biometricSuccess) {
-        await resetFailedAttempts();
-        return true;
+      try {
+        const biometricSuccess = await authenticateWithBiometric();
+        if (biometricSuccess) {
+          await resetFailedAttempts();
+          return true;
+        }
+      } catch (bioError) {
+        // Log the specific biometric error for user feedback
+        console.error('Biometric authentication error:', bioError);
+        
+        // If there's a specific error message, we could throw it
+        // But we'll fall through to PIN as a graceful fallback
+        const errorMessage = bioError instanceof Error 
+          ? bioError.message 
+          : 'Biometric authentication failed';
+        
+        console.log(`${errorMessage}, falling back to PIN`);
+        
+        // If user explicitly cancelled, we might want to throw
+        if (bioError instanceof Error && bioError.message.includes('cancel')) {
+          throw new SecurityError('Authentication cancelled. Please use PIN.');
+        }
       }
     }
 
@@ -228,32 +361,37 @@ export const authenticateUser = async (pin?: string): Promise<boolean> => {
         return true;
       } else {
         await trackFailedAttempt();
-        return false;
+        throw new SecurityError('Invalid PIN');
       }
     }
 
-    return false;
+    throw new SecurityError('Authentication required');
   } catch (error) {
     console.error('Error authenticating user:', error);
-    return false;
+    if (error instanceof SecurityError) {
+      throw error;
+    }
+    throw new SecurityError('Authentication failed. Please try again.');
   }
 };
 
 // DEVICE MANAGEMENT
-// Get current device information
-export const getDeviceInfo = async (): Promise<{
-  deviceId: string;
-  deviceName: string;
-  deviceType: 'android' | 'ios';
-}> => {
+/**
+ * Get current device information
+ * @returns Promise<DeviceInfo>
+ */
+export const getDeviceInfo = async (): Promise<DeviceInfo> => {
   const deviceId = Constants.sessionId || 'unknown';
   const deviceName = Constants.deviceName || 'Unknown Device';
-  const deviceType = Platform.OS === 'ios' ? 'ios' : 'android';
+  const deviceType: 'android' | 'ios' = Platform.OS === 'ios' ? 'ios' : 'android';
 
   return { deviceId, deviceName, deviceType };
 };
 
-// Check if current device is new (not in known devices)
+/**
+ * Check if current device is new (not in known devices)
+ * @returns Promise<boolean> - Whether device is new
+ */
 export const isNewDevice = async (): Promise<boolean> => {
   try {
     const currentDevice = await getDeviceInfo();
@@ -271,7 +409,11 @@ export const isNewDevice = async (): Promise<boolean> => {
   }
 };
 
-// Mark current device as known
+/**
+ * Mark current device as known
+ * @returns Promise<boolean> - Success status
+ * @throws SecurityError if registration fails
+ */
 export const markDeviceAsKnown = async (): Promise<boolean> => {
   try {
     const currentDevice = await getDeviceInfo();
@@ -287,29 +429,42 @@ export const markDeviceAsKnown = async (): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error marking device as known:', error);
-    return false;
+    throw new SecurityError('Failed to register device. Please try again.');
   }
 };
 
 // FAILED ATTEMPTS & LOCKOUT
-// Track failed login attempt
+/**
+ * Track failed login attempt
+ * @returns Promise<void>
+ * @throws SecurityError if max attempts reached
+ */
 export const trackFailedAttempt = async (): Promise<void> => {
   try {
     const attemptsJson = await AsyncStorage.getItem(FAILED_ATTEMPTS_KEY);
-    const attempts = attemptsJson ? parseInt(attemptsJson) : 0;
+    const attempts = attemptsJson ? parseInt(attemptsJson, 10) : 0;
     const newAttempts = attempts + 1;
 
     await AsyncStorage.setItem(FAILED_ATTEMPTS_KEY, newAttempts.toString());
 
     if (newAttempts >= MAX_FAILED_ATTEMPTS) {
       await lockAccount();
+      throw new SecurityError(
+        `Too many failed attempts. Account locked for ${LOCKOUT_DURATION / 60000} minutes.`
+      );
     }
   } catch (error) {
     console.error('Error tracking failed attempt:', error);
+    if (error instanceof SecurityError) {
+      throw error;
+    }
   }
 };
 
-// Reset failed attempts counter
+/**
+ * Reset failed attempts counter
+ * @returns Promise<void>
+ */
 export const resetFailedAttempts = async (): Promise<void> => {
   try {
     await AsyncStorage.setItem(FAILED_ATTEMPTS_KEY, '0');
@@ -319,17 +474,25 @@ export const resetFailedAttempts = async (): Promise<void> => {
   }
 };
 
-// Lock account for specified duration
+/**
+ * Lock account for specified duration
+ * @returns Promise<void>
+ * @throws SecurityError if lock fails
+ */
 export const lockAccount = async (): Promise<void> => {
   try {
     const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION).toISOString();
     await AsyncStorage.setItem(LOCKED_UNTIL_KEY, lockedUntil);
   } catch (error) {
     console.error('Error locking account:', error);
+    throw new SecurityError('Failed to lock account');
   }
 };
 
-// Check if account is currently locked
+/**
+ * Check if account is currently locked
+ * @returns Promise<boolean> - Whether account is locked
+ */
 export const isAccountLocked = async (): Promise<boolean> => {
   try {
     const lockedUntilJson = await AsyncStorage.getItem(LOCKED_UNTIL_KEY);
@@ -354,7 +517,10 @@ export const isAccountLocked = async (): Promise<boolean> => {
   }
 };
 
-// Get remaining lockout time in seconds
+/**
+ * Get remaining lockout time in seconds
+ * @returns Promise<number> - Remaining time in seconds
+ */
 export const getRemainingLockoutTime = async (): Promise<number> => {
   try {
     const lockedUntilJson = await AsyncStorage.getItem(LOCKED_UNTIL_KEY);

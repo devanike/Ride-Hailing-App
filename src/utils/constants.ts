@@ -1,4 +1,4 @@
-export const APP_NAME = 'UI Campus Cab';
+export const APP_NAME = 'UI-Ride';
 export const APP_VERSION = '1.0.0';
 
 // CAMPUS BOUNDARIES (University of Ibadan)
@@ -12,6 +12,28 @@ export const CAMPUS_BOUNDARIES = {
 export const CAMPUS_CENTER = {
   latitude: 7.4407,
   longitude: 3.9000,
+};
+
+// MAP CONFIGURATION (NEW)
+export const MAP_CONFIG = {
+  // Initial region for map
+  initialRegion: {
+    latitude: CAMPUS_CENTER.latitude,
+    longitude: CAMPUS_CENTER.longitude,
+    latitudeDelta: 0.05,    // Zoom level
+    longitudeDelta: 0.05,
+  },
+  
+  // Map padding for UI elements
+  edgePadding: {
+    top: 50,
+    right: 50,
+    bottom: 50,
+    left: 50,
+  },
+  
+  // Animation duration
+  animationDuration: 300,
 };
 
 // PRICING CONFIGURATION
@@ -65,17 +87,20 @@ export const PAGINATION = {
 
 // SUPPORT CONTACT
 export const SUPPORT = {
-  email: 'support@uicampuscab.com',
+  email: 'support@uiride.com',
   phone: '+234 800 000 0000',
   whatsapp: '+234 800 000 0000',
 };
 
 // DEEP LINKS
 export const DEEP_LINKS = {
-  scheme: 'uicampuscab',
-  paymentCallback: 'uicampuscab://payment-callback',
-  rideDetails: 'uicampuscab://ride-details',
+  scheme: 'uirideapp://',
+  paymentCallback: 'uirideapp://payment-callback',
+  rideDetails: 'uirideapp://ride-details',
 };
+
+// GOOGLE MAPS API KEY (NEW)
+export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 // SECURITY CONFIGURATION
 export const SECURITY = {
@@ -88,11 +113,54 @@ export const SECURITY = {
   requireBiometricReauth: false, // Require biometric every time or allow remember
 };
 
+/**
+ * Helper function to check if coordinates are within campus
+ */
+export const isWithinCampus = (latitude: number, longitude: number): boolean => {
+  return (
+    latitude >= CAMPUS_BOUNDARIES.south &&
+    latitude <= CAMPUS_BOUNDARIES.north &&
+    longitude >= CAMPUS_BOUNDARIES.west &&
+    longitude <= CAMPUS_BOUNDARIES.east
+  );
+};
+
+/**
+ * Helper function to calculate distance between two points (Haversine formula)
+ */
+export const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance; // Distance in km
+};
+
+const toRad = (value: number): number => {
+  return (value * Math.PI) / 180;
+};
+
 export default {
   APP_NAME,
   APP_VERSION,
   CAMPUS_BOUNDARIES,
   CAMPUS_CENTER,
+  MAP_CONFIG,
   DISTANCE_THRESHOLDS,
   TIME_LIMITS,
   VALIDATION,
@@ -100,4 +168,8 @@ export default {
   PAGINATION,
   SUPPORT,
   DEEP_LINKS,
+  GOOGLE_MAPS_API_KEY,
+  SECURITY,
+  isWithinCampus,
+  calculateDistance,
 };

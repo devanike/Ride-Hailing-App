@@ -12,9 +12,14 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.uirideapp",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and provide ride services.",
+        "NSLocationWhenInUseUsageDescription": "UI-Ride needs your location to show nearby drivers and enable ride tracking.",
         "NSCameraUsageDescription": "We need camera access to upload profile photos and vehicle documents.",
-        "NSPhotoLibraryUsageDescription": "We need photo library access to upload images."
+        "NSPhotoLibraryUsageDescription": "We need photo library access to upload images.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "UI-Ride needs your location to track your ride even when the app is in the background.",
+        "NSLocationAlwaysUsageDescription": "UI-Ride needs your location to track your ride even when the app is in the background."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyA3fPgeiMdeZySEj6oeJZH53FqwWVLBqsE"
       }
     },
     "android": {
@@ -29,8 +34,16 @@
         "ACCESS_FINE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA3fPgeiMdeZySEj6oeJZH53FqwWVLBqsE"
+        }
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -56,7 +69,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow UI Campus Cab to use your location for ride services."
+          "locationAlwaysAndWhenInUsePermission": "Allow UI Campus Cab to use your location for ride services.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

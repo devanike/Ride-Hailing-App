@@ -4,7 +4,6 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { PINPad } from '@/components/common/PinPad';
 import { useTheme } from '@/hooks/useTheme';
-import { auth } from '@/services/firebaseConfig';
 import {
   authenticateWithBiometric,
   getBiometricCapability,
@@ -72,12 +71,12 @@ export default function LoginScreen() {
       setCheckingAuth(true);
 
       // Check if user is already logged in
-      if (auth.currentUser) {
-        // User is logged in, navigate to home
-        // TODO: Check user type and navigate appropriately
-        router.replace('/(auth)/welcome'); // Temporary
-        return;
-      }
+      // if (auth.currentUser) {
+      //   // User is logged in, navigate to home
+      //   // TODO: Check user type and navigate appropriately
+      //   router.replace('/(auth)/welcome'); // Temporary
+      //   return;
+      // }
 
       // Check if user has PIN set up
       const pinExists = await hasPIN();

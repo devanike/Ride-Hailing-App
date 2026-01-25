@@ -1,3 +1,4 @@
+import { AuthProvider, useAuthRefresh } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { auth, db } from '@/services/firebaseConfig';
 import {
@@ -8,8 +9,8 @@ import {
   isNewDevice,
 } from '@/services/securityService';
 import { toastConfig } from '@/utils/toastConfig';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -22,73 +23,25 @@ import Toast from 'react-native-toast-message';
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
-// Configure initial route
-export const unstable_settings = {
-  initialRouteName: '(passenger)',
-};
-
 type AuthState = 
   | 'loading' 
   | 'unauthenticated' 
   | 'no-pin' 
   | 'new-device' 
   | 'needs-pin'
-  | 'driver-incomplete' // New state for incomplete driver registration
+  | 'driver-incomplete'
   | 'authenticated';
 
 type UserType = 'passenger' | 'driver' | 'admin';
 
 /**
- * Custom hook for protected route navigation
- * Navigation is determined ONLY by auth state changes, not by route changes
+ * Inner layout component that uses auth context
  */
-function useProtectedRoute(authState: AuthState, userType: UserType) {
+function RootLayoutInner() {
+  const { colors } = useTheme();
   const router = useRouter();
-
-  useEffect(() => {
-    if (authState === 'loading') return;
-
-    // Determine target route based ONLY on auth state
-    let targetRoute: string | null = null;
-
-    switch (authState) {
-      case 'unauthenticated':
-        targetRoute = '/(auth)/welcome';
-        break;
-
-      case 'no-pin':
-        targetRoute = '/(auth)/pin-setup';
-        break;
-
-      case 'new-device':
-      case 'needs-pin':
-        targetRoute = '/(auth)/login';
-        break;
-
-      case 'driver-incomplete':
-        // Driver needs to complete registration
-        targetRoute = '/(driver)/driver-registration';
-        break;
-
-      case 'authenticated':
-        const routes: Record<UserType, string> = {
-          admin: '/(admin)',
-          driver: '/(driver)',
-          passenger: '/(passenger)',
-        };
-        targetRoute = routes[userType];
-        break;
-    }
-
-    // Navigate based on auth state only
-    if (targetRoute) {
-      router.replace(targetRoute as any);
-    }
-  }, [authState, userType, router]);
-}
-
-export default function RootLayout() {
-  const { colors, isDark } = useTheme();
+  const segments = useSegments();
+  const { authRefreshKey } = useAuthRefresh();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [userType, setUserType] = useState<UserType>('passenger');
 
@@ -127,7 +80,6 @@ export default function RootLayout() {
 
   /**
    * Handle Firebase auth state changes
-   * This is the SINGLE source of truth for auth state
    */
   const handleAuthStateChange = useCallback(async (user: User | null) => {
     if (!user) {
@@ -170,11 +122,11 @@ export default function RootLayout() {
     }
   }, [loadUserTypeAndComplete]);
 
-  // Listen to auth state changes (runs once on mount)
+  // Listen to auth state changes AND auth refresh key
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
     return () => unsubscribe();
-  }, [handleAuthStateChange]);
+  }, [handleAuthStateChange, authRefreshKey]); // Re-run when authRefreshKey changes
 
   // Hide splash screen once auth state is determined
   useEffect(() => {
@@ -185,8 +137,51 @@ export default function RootLayout() {
     }
   }, [authState]);
 
-  // Handle navigation based on auth state only
-  useProtectedRoute(authState, userType);
+  // Handle navigation based on auth state
+  useEffect(() => {
+    if (authState === 'loading') return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    let targetRoute: string | null = null;
+
+    switch (authState) {
+      case 'unauthenticated':
+        if (!inAuthGroup) {
+          targetRoute = '/(auth)/welcome';
+        }
+        break;
+
+      case 'no-pin':
+        targetRoute = '/(auth)/pin-setup';
+        break;
+
+      case 'new-device':
+      case 'needs-pin':
+        if (!inAuthGroup) {
+          targetRoute = '/(auth)/login';
+        }
+        break;
+
+      case 'driver-incomplete':
+        targetRoute = '/(driver)/driver-registration';
+        break;
+
+      case 'authenticated':
+        if (inAuthGroup) {
+          const routes: Record<UserType, string> = {
+            admin: '/(admin)',
+            driver: '/(driver)',
+            passenger: '/(passenger)',
+          };
+          targetRoute = routes[userType];
+        }
+        break;
+    }
+
+    if (targetRoute && segments.join('/') !== targetRoute.replace(/^\//, '')) {
+      router.replace(targetRoute as any);
+    }
+  }, [authState, userType, segments, router]);
 
   // Show loading screen while checking auth state
   if (authState === 'loading') {
@@ -198,7 +193,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         {/* Auth flow routes */}
         <Stack.Screen name="(auth)" />
@@ -277,6 +272,17 @@ export default function RootLayout() {
       <StatusBar style="auto" />
       <Toast config={toastConfig} />
     </ThemeProvider>
+  );
+}
+
+/**
+ * Root layout with AuthProvider
+ */
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutInner />
+    </AuthProvider>
   );
 }
 

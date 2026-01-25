@@ -1,7 +1,7 @@
 import {
+  ApplicationVerifier,
   ConfirmationResult,
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  RecaptchaVerifier,
   signInWithPhoneNumber,
   signOut,
   Unsubscribe,
@@ -12,43 +12,42 @@ import { auth } from './firebaseConfig';
 
 /**
  * Auth Service
- * Handles Firebase Authentication with Phone Number
+ * Handles Firebase Authentication with Phone Number (React Native)
  */
-
-// Store recaptcha verifier instance
-let recaptchaVerifier: RecaptchaVerifier | null = null;
 
 /**
- * Initialize reCAPTCHA verifier (for web/testing)
- * Note: For production React Native, you'll need to configure
- * Firebase Auth to work without reCAPTCHA or use a different method
+ * Simple verifier for React Native
+ * Firebase will use test numbers if configured in Console
  */
-export const initializeRecaptcha = (containerId: string): void => {
-  if (!recaptchaVerifier) {
-    recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'invisible',
-      callback: () => {
-        console.log('reCAPTCHA verified');
-      },
-      'expired-callback': () => {
-        console.log('reCAPTCHA expired');
-      },
-    });
+class InvisibleVerifier implements ApplicationVerifier {
+  type = 'recaptcha' as const;
+  
+  async verify(): Promise<string> {
+    return '';
   }
-};
+
+  clear() {
+    // No-op
+  }
+
+  _reset() {
+    // No-op
+  }
+}
+
+// Create verifier instance
+const verifier = new InvisibleVerifier();
 
 /**
  * Send OTP to phone number
- * @param phoneNumber - Phone number in E.164 format (e.g., +2348012345678)
- * @returns ConfirmationResult for OTP verification
- * 
- * @example
- * const confirmationResult = await sendPhoneOTP('+2348012345678');
+ * Works with test phone numbers configured in Firebase Console
  */
 export const sendPhoneOTP = async (
   phoneNumber: string
 ): Promise<ConfirmationResult> => {
   try {
+    console.log('📱 Sending OTP to:', phoneNumber);
+    
     if (!phoneNumber.startsWith('+')) {
       throw new Error('Phone number must be in E.164 format (e.g., +2348012345678)');
     }
@@ -56,24 +55,25 @@ export const sendPhoneOTP = async (
     const confirmationResult = await signInWithPhoneNumber(
       auth,
       phoneNumber,
-      recaptchaVerifier!
+      verifier
     );
 
+    console.log('✅ OTP request successful');
     return confirmationResult;
   } catch (error: any) {
-    console.error('Error sending OTP:', error);
+    console.error('❌ Error sending OTP:', error);
+    console.error('Error code:', error.code);
+    
+    if (error.code === 'auth/argument-error') {
+      throw new Error('Please ensure test phone numbers are configured in Firebase Console');
+    }
+    
     throw new Error(error.message || 'Failed to send OTP');
   }
 };
 
 /**
  * Verify OTP code
- * @param confirmationResult - Result from sendPhoneOTP
- * @param code - 6-digit OTP code
- * @returns UserCredential
- * 
- * @example
- * const userCredential = await verifyOTP(confirmationResult, '123456');
  */
 export const verifyOTP = async (
   confirmationResult: ConfirmationResult,
@@ -90,13 +90,6 @@ export const verifyOTP = async (
 
 /**
  * Get current authenticated user
- * @returns Current user or null
- * 
- * @example
- * const user = getCurrentUser();
- * if (user) {
- *   console.log('User ID:', user.uid);
- * }
  */
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
@@ -104,9 +97,6 @@ export const getCurrentUser = (): User | null => {
 
 /**
  * Logout current user
- * 
- * @example
- * await logout();
  */
 export const logout = async (): Promise<void> => {
   try {
@@ -119,20 +109,6 @@ export const logout = async (): Promise<void> => {
 
 /**
  * Listen to auth state changes
- * @param callback - Function to call when auth state changes
- * @returns Unsubscribe function
- * 
- * @example
- * const unsubscribe = onAuthStateChanged((user) => {
- *   if (user) {
- *     console.log('User logged in:', user.uid);
- *   } else {
- *     console.log('User logged out');
- *   }
- * });
- * 
- * // Later, to stop listening:
- * unsubscribe();
  */
 export const onAuthStateChanged = (
   callback: (user: User | null) => void
@@ -141,7 +117,6 @@ export const onAuthStateChanged = (
 };
 
 export default {
-  initializeRecaptcha,
   sendPhoneOTP,
   verifyOTP,
   getCurrentUser,

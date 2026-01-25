@@ -1,5 +1,6 @@
 import { Button } from '@/components/common/Button';
 import { PINPad } from '@/components/common/PinPad';
+import { useAuthRefresh } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import {
   enableBiometric,
@@ -8,9 +9,9 @@ import {
   setupPIN,
 } from '@/services/securityService';
 import { showError, showSuccess } from '@/utils/toast';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Fingerprint } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
   StatusBar,
@@ -26,26 +27,62 @@ export default function PINSetupScreen() {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
   const params = useLocalSearchParams();
   const isReset = params.isReset === 'true';
+  const { refreshAuthState } = useAuthRefresh();
   
   const [currentStep, setCurrentStep] = useState<SetupStep>('create');
   const [firstPin, setFirstPin] = useState('');
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showBiometricModal, setShowBiometricModal] = useState(false);
+  const [pinKey, setPinKey] = useState(0);
 
-  const handleCreatePin = async (pin: string) => {
+  // Reset PINPad when step changes
+  useEffect(() => {
+    setPinKey(prev => prev + 1);
+    setError(false);
+  }, [currentStep]);
+
+  /**
+   * Complete PIN setup and trigger auth state refresh
+   * _layout.tsx will handle navigation based on user type
+   */
+  const completeSetup = useCallback(async () => {
+    try {
+      const successMessage = isReset 
+        ? 'PIN Reset Successfully' 
+        : 'Account Created';
+      const successDescription = isReset
+        ? 'Your PIN has been reset successfully'
+        : 'Your account has been set up successfully';
+      
+      showSuccess(successMessage, successDescription);
+      
+      // Trigger auth state refresh in _layout.tsx
+      // This will cause _layout.tsx to re-evaluate auth state and navigate appropriately
+      refreshAuthState();
+      
+    } catch (err) {
+      console.error('Error completing setup:', err);
+      showError('Error', 'Failed to complete setup. Please try again.');
+    }
+  }, [isReset, refreshAuthState]);
+
+  const handleCreatePin = useCallback((pin: string) => {
     setFirstPin(pin);
     setCurrentStep('confirm');
     setError(false);
-  };
+  }, []);
 
-  const handleConfirmPin = async (pin: string) => {
+  const handleConfirmPin = useCallback(async (pin: string) => {
     if (pin !== firstPin) {
       setError(true);
       showError('PIN Mismatch', 'PINs do not match. Please try again.');
+      
       setTimeout(() => {
         setError(false);
-      }, 500);
+        setCurrentStep('create');
+        setFirstPin('');
+      }, 1000);
       return;
     }
 
@@ -74,55 +111,36 @@ export default function PINSetupScreen() {
         setShowBiometricModal(true);
       } else {
         // No biometric, complete setup
-        completeSetup();
+        await completeSetup();
       }
-    } catch (error: any) {
-      console.error('PIN setup error:', error);
-      showError('Setup Failed', error.message || 'Failed to setup PIN');
+    } catch (err: any) {
+      console.error('PIN setup error:', err);
+      showError('Setup Failed', err.message || 'Failed to setup PIN');
+      setCurrentStep('create');
+      setFirstPin('');
     } finally {
       setLoading(false);
     }
-  };
+  }, [firstPin, isReset, completeSetup]);
 
-  const handleEnableBiometric = async () => {
+  const handleEnableBiometric = useCallback(async () => {
     try {
       await enableBiometric();
       setShowBiometricModal(false);
       showSuccess('Success', 'Fingerprint authentication enabled');
-      completeSetup();
-    } catch (error: any) {
-      console.error('Biometric enable error:', error);
+      await completeSetup();
+    } catch (err: any) {
+      console.error('Biometric enable error:', err);
       showError('Error', 'Failed to enable fingerprint');
+      setShowBiometricModal(false);
+      await completeSetup();
     }
-  };
+  }, [completeSetup]);
 
-  const handleSkipBiometric = () => {
+  const handleSkipBiometric = useCallback(async () => {
     setShowBiometricModal(false);
-    completeSetup();
-  };
-
-  const completeSetup = () => {
-    const successMessage = isReset 
-      ? 'PIN Reset Successfully' 
-      : 'Account Created';
-    const successDescription = isReset
-      ? 'Your PIN has been reset successfully'
-      : 'Your account has been set up successfully';
-    
-    showSuccess(successMessage, successDescription);
-    
-    if (isReset) {
-      // For reset, go back to login
-      router.replace('/(auth)/login');
-    } else {
-      // For new setup, navigate based on user type
-      // TODO: Get user type from Firestore and navigate appropriately
-      // Passenger → /(passenger)
-      // Driver → /(driver) 
-      // Admin → /(admin)
-      router.replace('/(auth)/welcome'); 
-    }
-  };
+    await completeSetup();
+  }, [completeSetup]);
 
   const getTitle = () => {
     if (isReset) {
@@ -198,7 +216,6 @@ export default function PINSetupScreen() {
       textAlign: 'center',
       paddingHorizontal: spacing.xl,
     },
-    // Biometric Modal
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -272,8 +289,9 @@ export default function PINSetupScreen() {
           <Text style={styles.subtitle}>{getSubtitle()}</Text>
         </View>
 
-        {/* PIN Pad */}
+        {/* PIN Pad - Use key to force remount and clear state */}
         <PINPad
+          key={pinKey}
           length={6}
           onComplete={currentStep === 'create' ? handleCreatePin : handleConfirmPin}
           error={error}
