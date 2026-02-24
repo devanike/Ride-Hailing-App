@@ -1,10 +1,10 @@
-import { Button } from '@/components/common/Button';
-import { Input } from '@/components/common/Input';
-import { useTheme } from '@/hooks/useTheme';
-import { showError } from '@/utils/toast';
-import { router } from 'expo-router';
-import { Phone, User } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { Input } from "@/components/common/Input";
+import { useTheme } from "@/hooks/useTheme";
+import { showError } from "@/utils/toast";
+import { router } from "expo-router";
+import { Phone, User } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,48 +14,48 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type UserType = 'passenger' | 'driver';
+type UserType = "passenger" | "driver";
 
 export default function SignupScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [userType, setUserType] = useState<UserType>('passenger');
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [userType, setUserType] = useState<UserType>("passenger");
   const [loading, setLoading] = useState(false);
 
   // Validation
-  const [nameError, setNameError] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [nameError, setNameError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const validateInputs = (): boolean => {
     let isValid = true;
 
     // Validate name
     if (!name.trim()) {
-      setNameError('Name is required');
+      setNameError("Name is required");
       isValid = false;
     } else if (name.trim().length < 2) {
-      setNameError('Name must be at least 2 characters');
+      setNameError("Name must be at least 2 characters");
       isValid = false;
     } else {
-      setNameError('');
+      setNameError("");
     }
 
     // Validate phone
     if (!phone.trim()) {
-      setPhoneError('Phone number is required');
+      setPhoneError("Phone number is required");
       isValid = false;
     } else if (phone.length !== 10) {
-      setPhoneError('Phone number must be 10 digits');
+      setPhoneError("Phone number must be 10 digits");
       isValid = false;
     } else if (!/^\d+$/.test(phone)) {
-      setPhoneError('Phone number must contain only digits');
+      setPhoneError("Phone number must contain only digits");
       isValid = false;
     } else {
-      setPhoneError('');
+      setPhoneError("");
     }
 
     return isValid;
@@ -73,7 +73,7 @@ export default function SignupScreen() {
       // Navigate to OTP verification with data
       // OTP will be sent from the verification screen
       router.push({
-        pathname: '/(auth)/otp-verification',
+        pathname: "/(auth)/otp-verification",
         params: {
           name,
           phone: formattedPhone,
@@ -81,8 +81,8 @@ export default function SignupScreen() {
         },
       });
     } catch (error: any) {
-      console.error('Signup error:', error);
-      showError('Signup Failed', error.message || 'Failed to proceed');
+      console.error("Signup error:", error);
+      showError("Signup Failed", error.message || "Failed to proceed");
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export default function SignupScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     scrollContent: {
       flexGrow: 1,
@@ -100,39 +100,39 @@ export default function SignupScreen() {
       paddingBottom: spacing.xl,
     },
     header: {
-      marginBottom: spacing['2xl'],
+      marginBottom: spacing.xxl,
     },
     title: {
-      fontSize: typography.sizes['3xl'],
+      fontSize: typography.sizes["3xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     // Testing helper banner
     testingBanner: {
-      backgroundColor: colors.status.infoLight,
+      backgroundColor: colors.info,
       padding: spacing.md,
       borderRadius: borderRadius.md,
       marginBottom: spacing.lg,
       borderLeftWidth: 4,
-      borderLeftColor: colors.status.info,
+      borderLeftColor: colors.info,
     },
     testingTitle: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.status.info,
+      color: colors.info,
       marginBottom: spacing.xs,
     },
     testingText: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.xs * typography.lineHeights.normal,
     },
     form: {
@@ -144,31 +144,31 @@ export default function SignupScreen() {
     userTypeLabel: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginBottom: spacing.sm,
     },
     userTypeOptions: {
-      flexDirection: 'row',
+      flexDirection: "row",
       gap: spacing.md,
     },
     userTypeOption: {
       flex: 1,
-      paddingVertical: spacing.base,
+      paddingVertical: spacing.md,
       paddingHorizontal: spacing.md,
       borderRadius: borderRadius.md,
       borderWidth: 2,
-      borderColor: colors.border.light,
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: colors.surface,
     },
     userTypeOptionActive: {
       borderColor: colors.primary,
-      backgroundColor: colors.primary + '10',
+      backgroundColor: colors.primary + "10",
     },
     userTypeText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginTop: spacing.xs,
     },
     userTypeTextActive: {
@@ -176,18 +176,18 @@ export default function SignupScreen() {
       fontFamily: typography.fonts.body,
     },
     footer: {
-      marginTop: 'auto',
-      alignItems: 'center',
+      marginTop: "auto",
+      alignItems: "center",
     },
     loginPrompt: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: spacing.md,
     },
     loginPromptText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     loginLink: {
       fontSize: typography.sizes.sm,
@@ -198,11 +198,11 @@ export default function SignupScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -235,11 +235,11 @@ export default function SignupScreen() {
               value={name}
               onChangeText={(text) => {
                 setName(text);
-                setNameError('');
+                setNameError("");
               }}
               placeholder="Enter your full name"
               error={nameError}
-              leftIcon={<User size={20} color={colors.text.tertiary} />}
+              leftIcon={<User size={20} color={colors.textMuted} />}
               autoCapitalize="words"
             />
 
@@ -249,14 +249,14 @@ export default function SignupScreen() {
               value={phone}
               onChangeText={(text) => {
                 // Only allow digits
-                const cleaned = text.replace(/\D/g, '');
+                const cleaned = text.replace(/\D/g, "");
                 setPhone(cleaned);
-                setPhoneError('');
+                setPhoneError("");
               }}
               placeholder="8012345678"
               error={phoneError}
               keyboardType="phone-pad"
-              leftIcon={<Phone size={20} color={colors.text.tertiary} />}
+              leftIcon={<Phone size={20} color={colors.textMuted} />}
               maxLength={10}
             />
 
@@ -267,19 +267,23 @@ export default function SignupScreen() {
                 <TouchableOpacity
                   style={[
                     styles.userTypeOption,
-                    userType === 'passenger' && styles.userTypeOptionActive,
+                    userType === "passenger" && styles.userTypeOptionActive,
                   ]}
-                  onPress={() => setUserType('passenger')}
+                  onPress={() => setUserType("passenger")}
                   activeOpacity={0.7}
                 >
                   <User
                     size={32}
-                    color={userType === 'passenger' ? colors.primary : colors.text.tertiary}
+                    color={
+                      userType === "passenger"
+                        ? colors.primary
+                        : colors.textMuted
+                    }
                   />
                   <Text
                     style={[
                       styles.userTypeText,
-                      userType === 'passenger' && styles.userTypeTextActive,
+                      userType === "passenger" && styles.userTypeTextActive,
                     ]}
                   >
                     Passenger
@@ -289,19 +293,21 @@ export default function SignupScreen() {
                 <TouchableOpacity
                   style={[
                     styles.userTypeOption,
-                    userType === 'driver' && styles.userTypeOptionActive,
+                    userType === "driver" && styles.userTypeOptionActive,
                   ]}
-                  onPress={() => setUserType('driver')}
+                  onPress={() => setUserType("driver")}
                   activeOpacity={0.7}
                 >
                   <User
                     size={32}
-                    color={userType === 'driver' ? colors.primary : colors.text.tertiary}
+                    color={
+                      userType === "driver" ? colors.primary : colors.textMuted
+                    }
                   />
                   <Text
                     style={[
                       styles.userTypeText,
-                      userType === 'driver' && styles.userTypeTextActive,
+                      userType === "driver" && styles.userTypeTextActive,
                     ]}
                   >
                     Driver
@@ -325,8 +331,10 @@ export default function SignupScreen() {
 
             {/* Login Prompt */}
             <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>Already have an account?</Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+              <Text style={styles.loginPromptText}>
+                Already have an account?
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
                 <Text style={styles.loginLink}>Sign In</Text>
               </TouchableOpacity>
             </View>

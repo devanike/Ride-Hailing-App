@@ -1,5 +1,5 @@
-import 'dotenv/config';
-import { ConfigContext, ExpoConfig } from 'expo/config';
+import "dotenv/config";
+import { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -9,29 +9,34 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "uirideapp",
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: "light",
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.yourcompany.uirideapp",
     infoPlist: {
-      NSLocationWhenInUseUsageDescription: "UI-Ride needs your location to show nearby drivers and enable ride tracking.",
-      NSCameraUsageDescription: "We need camera access to upload profile photos and vehicle documents.",
-      NSPhotoLibraryUsageDescription: "We need photo library access to upload images.",
-      NSLocationAlwaysAndWhenInUseUsageDescription: "UI-Ride needs your location to track your ride even when the app is in the background.",
-      NSLocationAlwaysUsageDescription: "UI-Ride needs your location to track your ride even when the app is in the background."
+      NSLocationWhenInUseUsageDescription:
+        "UI-Ride needs your location to show nearby drivers and enable ride tracking.",
+      NSCameraUsageDescription:
+        "We need camera access to upload profile photos and vehicle documents.",
+      NSPhotoLibraryUsageDescription:
+        "We need photo library access to upload images.",
+      NSLocationAlwaysAndWhenInUseUsageDescription:
+        "UI-Ride needs your location to track your ride even when the app is in the background.",
+      NSLocationAlwaysUsageDescription:
+        "UI-Ride needs your location to track your ride even when the app is in the background.",
     },
     config: {
       // The ?? "" prevents TypeScript errors if the variable is missing
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-    }
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+    },
   },
   android: {
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png"
+      monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     permissions: [
       "ACCESS_COARSE_LOCATION",
@@ -41,19 +46,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "WRITE_EXTERNAL_STORAGE",
       "ACCESS_BACKGROUND_LOCATION",
       "FOREGROUND_SERVICE",
-      "FOREGROUND_SERVICE_LOCATION"
+      "FOREGROUND_SERVICE_LOCATION",
     ],
     config: {
       googleMaps: {
-        apiKey: process.env.GOOGLE_MAPS_API_KEY ?? ""
-      }
+        apiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+      },
     },
     edgeToEdgeEnabled: true,
-    predictiveBackGestureEnabled: false
+    predictiveBackGestureEnabled: false,
   },
   web: {
     output: "static",
-    favicon: "./assets/images/favicon.png"
+    favicon: "./assets/images/favicon.png",
   },
   plugins: [
     "expo-router",
@@ -65,28 +70,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          backgroundColor: "#000000"
-        }
-      }
+          backgroundColor: "#000000",
+        },
+      },
     ],
     "expo-font",
     [
       "expo-location",
       {
-        locationAlwaysAndWhenInUsePermission: "Allow UI Campus Cab to use your location for ride services.",
+        locationAlwaysAndWhenInUsePermission:
+          "Allow UI Campus Cab to use your location for ride services.",
         isAndroidBackgroundLocationEnabled: true,
-        isAndroidForegroundServiceEnabled: true
-      }
+        isAndroidForegroundServiceEnabled: true,
+      },
     ],
     [
       "expo-image-picker",
       {
-        photosPermission: "The app needs access to your photos to upload profile and vehicle images."
-      }
-    ]
+        photosPermission:
+          "The app needs access to your photos to upload profile and vehicle images.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true
-  }
+    reactCompiler: true,
+  },
 });

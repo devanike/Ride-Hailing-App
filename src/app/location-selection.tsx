@@ -1,53 +1,54 @@
-import { Button } from '@/components/common/Button';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { LocationCategoryFilter } from '@/components/common/LocationCategoryFilter';
-import { OutsideCampusModal } from '@/components/common/OutsideCampusModal';
-import { PopularLocations } from '@/components/common/PopularLocations';
-import { DropoffMarker } from '@/components/map/DropoffMarker';
-import { MapComponent, MapComponentRef } from '@/components/map/MapComponent';
-import { PickupMarker } from '@/components/map/PickupMarker';
-import { UserMarker } from '@/components/map/UserMarker';
-import { useCampusBoundary } from '@/hooks/useCampusBoundary';
-import { useLocation } from '@/hooks/useLocation';
-import { useTheme } from '@/hooks/useTheme';
-import {
-  getAddressFromCoordinates
-} from '@/services/locationService';
-import { LocationCategory, PopularLocation } from '@/types/locations';
-import { Coordinates } from '@/types/map';
-import { PlaceDetails } from '@/types/places';
-import { showError } from '@/utils/toast';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, MapPin, Navigation } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { LocationCategoryFilter } from "@/components/common/LocationCategoryFilter";
+import { OutsideCampusModal } from "@/components/common/OutsideCampusModal";
+import { PopularLocations } from "@/components/common/PopularLocations";
+import { DropoffMarker } from "@/components/map/DropoffMarker";
+import { MapComponent, MapComponentRef } from "@/components/map/MapComponent";
+import { PickupMarker } from "@/components/map/PickupMarker";
+import { UserMarker } from "@/components/map/UserMarker";
+import { useCampusBoundary } from "@/hooks/useCampusBoundary";
+import { useLocation } from "@/hooks/useLocation";
+import { useTheme } from "@/hooks/useTheme";
+import { getAddressFromCoordinates } from "@/services/locationService";
+import { LocationCategory, PopularLocation } from "@/types/locations";
+import { Coordinates } from "@/types/map";
+import { PlaceDetails } from "@/types/places";
+import { showError } from "@/utils/toast";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { router, useLocalSearchParams } from "expo-router";
+import { ArrowLeft, MapPin, Navigation } from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type LocationType = 'pickup' | 'dropoff';
+type LocationType = "pickup" | "dropoff";
 
 export default function LocationSelectionScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const params = useLocalSearchParams();
-  const locationType = (params.type as LocationType) || 'pickup';
+  const locationType = (params.type as LocationType) || "pickup";
 
   const mapRef = useRef<MapComponentRef>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const { location: userLocation, loading: locationLoading } = useLocation(true);
+  const { location: userLocation, loading: locationLoading } =
+    useLocation(true);
   const { checkLocation, showWarning, setShowWarning } = useCampusBoundary();
 
   const [selectedLocation, setSelectedLocation] = useState<{
     coordinate: Coordinates;
     address: string;
   } | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<LocationCategory | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<
+    LocationCategory | "all"
+  >("all");
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
 
@@ -61,7 +62,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         },
-        300
+        300,
       );
     }
   }, [userLocation]);
@@ -83,12 +84,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         // Get address from coordinates
         const addressResult = await getAddressFromCoordinates(
           coordinate.latitude,
-          coordinate.longitude
+          coordinate.longitude,
         );
 
         setSelectedLocation({
           coordinate,
-          address: addressResult?.formattedAddress || 'Selected location',
+          address: addressResult?.formattedAddress || "Selected location",
         });
 
         // Animate map to selected location
@@ -98,18 +99,18 @@ export default function LocationSelectionScreen(): React.JSX.Element {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          300
+          300,
         );
       } catch (error) {
-        console.error('Error handling map press:', error);
+        console.error("Error handling map press:", error);
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to select location';
-        showError('Error', errorMessage);
+          error instanceof Error ? error.message : "Failed to select location";
+        showError("Error", errorMessage);
       } finally {
         setAddressLoading(false);
       }
     },
-    [checkLocation]
+    [checkLocation],
   );
 
   /**
@@ -123,7 +124,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         // Check if it's a PopularLocation or PlaceDetails
         const coordinate = location.coordinate;
         const address =
-          'shortName' in location ? location.name : location.formattedAddress;
+          "shortName" in location ? location.name : location.formattedAddress;
 
         // Check if location is on campus
         const onCampus = checkLocation(coordinate);
@@ -143,21 +144,21 @@ export default function LocationSelectionScreen(): React.JSX.Element {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          300
+          300,
         );
 
         // Collapse bottom sheet to show map
         bottomSheetRef.current?.snapToIndex(0);
       } catch (error) {
-        console.error('Error selecting location:', error);
+        console.error("Error selecting location:", error);
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to select location';
-        showError('Error', errorMessage);
+          error instanceof Error ? error.message : "Failed to select location";
+        showError("Error", errorMessage);
       } finally {
         setAddressLoading(false);
       }
     },
-    [checkLocation]
+    [checkLocation],
   );
 
   /**
@@ -165,7 +166,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
    */
   const handleUseCurrentLocation = useCallback(async (): Promise<void> => {
     if (!userLocation) {
-      showError('Location Error', 'Unable to get your current location');
+      showError("Location Error", "Unable to get your current location");
       return;
     }
 
@@ -181,7 +182,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       // Get address from current location
       const addressResult = await getAddressFromCoordinates(
         userLocation.latitude,
-        userLocation.longitude
+        userLocation.longitude,
       );
 
       setSelectedLocation({
@@ -189,7 +190,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
         },
-        address: addressResult?.formattedAddress || 'Current location',
+        address: addressResult?.formattedAddress || "Current location",
       });
 
       // Animate map to current location
@@ -200,13 +201,15 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         },
-        300
+        300,
       );
     } catch (error) {
-      console.error('Error using current location:', error);
+      console.error("Error using current location:", error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to use current location';
-      showError('Error', errorMessage);
+        error instanceof Error
+          ? error.message
+          : "Failed to use current location";
+      showError("Error", errorMessage);
     } finally {
       setAddressLoading(false);
     }
@@ -217,7 +220,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
    */
   const handleConfirm = useCallback(async (): Promise<void> => {
     if (!selectedLocation) {
-      showError('No Location', 'Please select a location first');
+      showError("No Location", "Please select a location first");
       return;
     }
 
@@ -226,7 +229,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
 
       // Return to previous screen with selected location
       router.back();
-      
+
       // Pass location data back via router params
       setTimeout(() => {
         router.setParams({
@@ -237,8 +240,8 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         });
       }, 100);
     } catch (error) {
-      console.error('Error confirming location:', error);
-      showError('Error', 'Failed to confirm location');
+      console.error("Error confirming location:", error);
+      showError("Error", "Failed to confirm location");
     } finally {
       setConfirmLoading(false);
     }
@@ -254,26 +257,28 @@ export default function LocationSelectionScreen(): React.JSX.Element {
   }, [setShowWarning]);
 
   const getTitle = (): string => {
-    return locationType === 'pickup' ? 'Select Pickup Location' : 'Select Dropoff Location';
+    return locationType === "pickup"
+      ? "Select Pickup Location"
+      : "Select Dropoff Location";
   };
 
   const getMarkerColor = (): string => {
-    return locationType === 'pickup' ? colors.status.success : colors.status.error;
+    return locationType === "pickup" ? colors.success : colors.error;
   };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     header: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       paddingHorizontal: spacing.screenPadding,
-      paddingVertical: spacing.base,
-      backgroundColor: colors.surface.light,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.surface,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
+      borderBottomColor: colors.border,
       ...shadows.small,
     },
     backButton: {
@@ -283,22 +288,22 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     headerTitle: {
       fontSize: typography.sizes.lg,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       flex: 1,
     },
     map: {
       flex: 1,
     },
     currentLocationButton: {
-      position: 'absolute',
-      top: spacing.base,
+      position: "absolute",
+      top: spacing.md,
       right: spacing.screenPadding,
       width: 48,
       height: 48,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.surface.light,
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
       ...shadows.medium,
     },
     bottomSheetContent: {
@@ -306,16 +311,16 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       paddingBottom: spacing.xl,
     },
     selectedLocationContainer: {
-      backgroundColor: colors.surface.light,
-      padding: spacing.base,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
-      marginBottom: spacing.base,
+      borderColor: colors.border,
+      marginBottom: spacing.md,
     },
     selectedLocationHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       marginBottom: spacing.sm,
     },
     selectedLocationIcon: {
@@ -324,23 +329,23 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     selectedLocationTitle: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     selectedLocationAddress: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     divider: {
       height: 1,
-      backgroundColor: colors.border.light,
-      marginVertical: spacing.base,
+      backgroundColor: colors.border,
+      marginVertical: spacing.md,
     },
     sectionTitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.sm,
     },
     locationsContainer: {
@@ -353,10 +358,13 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <SafeAreaView edges={['top']}>
+      <SafeAreaView edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color={colors.text.primary} />
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{getTitle()}</Text>
         </View>
@@ -372,12 +380,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           selectedLocation
             ? [
                 {
-                  id: 'selected',
+                  id: "selected",
                   coordinate: selectedLocation.coordinate,
                   title: selectedLocation.address,
-                  type: locationType === 'pickup' ? 'pickup' : 'dropoff',
+                  type: locationType === "pickup" ? "pickup" : "dropoff",
                   icon:
-                    locationType === 'pickup' ? (
+                    locationType === "pickup" ? (
                       <PickupMarker
                         coordinate={selectedLocation.coordinate}
                         address={selectedLocation.address}
@@ -391,26 +399,26 @@ export default function LocationSelectionScreen(): React.JSX.Element {
                 },
               ]
             : userLocation
-            ? [
-                {
-                  id: 'user',
-                  coordinate: {
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
+              ? [
+                  {
+                    id: "user",
+                    coordinate: {
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                    },
+                    title: "Your location",
+                    type: "user",
+                    icon: (
+                      <UserMarker
+                        coordinate={{
+                          latitude: userLocation.latitude,
+                          longitude: userLocation.longitude,
+                        }}
+                      />
+                    ),
                   },
-                  title: 'Your location',
-                  type: 'user',
-                  icon: (
-                    <UserMarker
-                      coordinate={{
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
-                      }}
-                    />
-                  ),
-                },
-              ]
-            : []
+                ]
+              : []
         }
       />
 
@@ -422,7 +430,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       >
         <Navigation
           size={24}
-          color={userLocation ? colors.primary : colors.text.tertiary}
+          color={userLocation ? colors.primary : colors.textMuted}
         />
       </TouchableOpacity>
 
@@ -430,12 +438,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       <BottomSheet
         ref={bottomSheetRef}
         index={1}
-        snapPoints={['25%', '50%', '90%']}
+        snapPoints={["25%", "50%", "90%"]}
         backgroundStyle={{
-          backgroundColor: colors.surface.light,
+          backgroundColor: colors.surface,
         }}
         handleIndicatorStyle={{
-          backgroundColor: colors.border.medium,
+          backgroundColor: colors.border,
         }}
       >
         <BottomSheetScrollView
@@ -453,7 +461,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
                     style={styles.selectedLocationIcon}
                   />
                   <Text style={styles.selectedLocationTitle}>
-                    Selected {locationType === 'pickup' ? 'Pickup' : 'Dropoff'}
+                    Selected {locationType === "pickup" ? "Pickup" : "Dropoff"}
                   </Text>
                 </View>
                 <Text style={styles.selectedLocationAddress}>
@@ -483,8 +491,8 @@ export default function LocationSelectionScreen(): React.JSX.Element {
 
           {/* Popular Locations List */}
           <Text style={styles.sectionTitle}>
-            {selectedCategory === 'all'
-              ? 'Popular Locations'
+            {selectedCategory === "all"
+              ? "Popular Locations"
               : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Locations`}
           </Text>
 
@@ -492,7 +500,9 @@ export default function LocationSelectionScreen(): React.JSX.Element {
             <PopularLocations
               onLocationSelect={handleLocationSelect}
               selectedLocationId={undefined}
-              filterCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
+              filterCategory={
+                selectedCategory !== "all" ? selectedCategory : undefined
+              }
               enableGoogleSearch={true}
             />
           </View>
@@ -511,7 +521,9 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       {(locationLoading || addressLoading) && (
         <LoadingSpinner
           fullScreen
-          message={addressLoading ? 'Getting address...' : 'Getting your location...'}
+          message={
+            addressLoading ? "Getting address..." : "Getting your location..."
+          }
         />
       )}
     </View>

@@ -1,43 +1,26 @@
 export interface ColorPalette {
   primary: string;
-  primaryLight: string;
-  primaryDark: string;
   accent: string;
-  accentLight: string;
-  accentDark: string;
-  background: {
-    light: string;
-    gray: string;
-    dark: string;
-  };
-  surface: {
-    light: string;
-    gray: string;
-    dark: string;
-  };
-  text: {
-    primary: string;
-    secondary: string;
-    tertiary: string;
-    inverse: string;
-    link: string;
-  };
-  border: {
-    light: string;
-    medium: string;
-    dark: string;
-    focus: string;
-  };
-  status: {
-    success: string;
-    successLight: string;
-    error: string;
-    errorLight: string;
-    warning: string;
-    warningLight: string;
-    info: string;
-    infoLight: string;
-  };
+  background: string;
+  backgroundAlt: string;
+  surface: string;
+  surfaceAlt: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  textLink: string;
+  border: string;
+  borderStrong: string;
+  borderFocus: string;
+  success: string;
+  successBackground: string;
+  error: string;
+  errorBackground: string;
+  warning: string;
+  warningBackground: string;
+  info: string;
+  infoBackground: string;
   overlay: string;
 }
 
@@ -57,11 +40,11 @@ export interface Typography {
     base: number;
     lg: number;
     xl: number;
-    '2xl': number;
-    '3xl': number;
-    '4xl': number;
-    '5xl': number;
-    '6xl': number;
+    "2xl": number;
+    "3xl": number;
+    "4xl": number;
+    "5xl": number;
+    "6xl": number;
   };
   weights: {
     regular: string;
@@ -85,13 +68,9 @@ export interface Spacing {
   xs: number;
   sm: number;
   md: number;
-  base: number;
   lg: number;
   xl: number;
-  '2xl': number;
-  '3xl': number;
-  '4xl': number;
-  '5xl': number;
+  xxl: number;
   screenPadding: number;
   cardPadding: number;
   buttonPadding: number;
@@ -101,12 +80,10 @@ export interface Spacing {
 }
 
 export interface BorderRadius {
-  none: number;
   sm: number;
   md: number;
   lg: number;
   xl: number;
-  '2xl': number;
   full: number;
 }
 
@@ -122,8 +99,6 @@ export interface Shadows {
   small: Shadow;
   medium: Shadow;
   large: Shadow;
-  xlarge: Shadow;
-  primaryButton: Shadow;
 }
 
 export interface Layout {
@@ -157,5 +132,3 @@ export interface Theme {
   shadows: Shadows;
   layout: Layout;
 }
-
-export type ThemeMode = 'light' | 'dark';

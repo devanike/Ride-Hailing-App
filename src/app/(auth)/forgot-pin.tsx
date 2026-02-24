@@ -1,12 +1,12 @@
-import { Button } from '@/components/common/Button';
-import { Input } from '@/components/common/Input';
-import { useTheme } from '@/hooks/useTheme';
-import { sendPhoneOTP, verifyOTP } from '@/services/authService';
-import { auth } from '@/services/firebaseConfig';
-import { showError, showSuccess } from '@/utils/toast';
-import { router } from 'expo-router';
-import { Phone } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { Input } from "@/components/common/Input";
+import { useTheme } from "@/hooks/useTheme";
+import { sendPhoneOTP, verifyOTP } from "@/services/authService";
+import { auth } from "@/services/firebaseConfig";
+import { showError, showSuccess } from "@/utils/toast";
+import { router } from "expo-router";
+import { Phone } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,19 +17,19 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type ForgotPinStep = 'phone' | 'otp' | 'complete';
+type ForgotPinStep = "phone" | "otp" | "complete";
 
 export default function ForgotPinScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
-  
+
   // States
-  const [currentStep, setCurrentStep] = useState<ForgotPinStep>('phone');
-  const [phone, setPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [currentStep, setCurrentStep] = useState<ForgotPinStep>("phone");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -39,7 +39,7 @@ export default function ForgotPinScreen() {
 
   // Timer for resend
   useEffect(() => {
-    if (currentStep === 'otp' && resendTimer > 0) {
+    if (currentStep === "otp" && resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
       return () => clearTimeout(timer);
     } else if (resendTimer === 0) {
@@ -49,19 +49,19 @@ export default function ForgotPinScreen() {
 
   const validatePhone = (): boolean => {
     if (!phone.trim()) {
-      setPhoneError('Phone number is required');
+      setPhoneError("Phone number is required");
       return false;
     }
     if (phone.length !== 10) {
-      setPhoneError('Phone number must be 10 digits');
+      setPhoneError("Phone number must be 10 digits");
       return false;
     }
     if (!/^\d+$/.test(phone)) {
-      setPhoneError('Phone number must contain only digits');
+      setPhoneError("Phone number must contain only digits");
       return false;
     }
-    
-    setPhoneError('');
+
+    setPhoneError("");
     return true;
   };
 
@@ -74,20 +74,23 @@ export default function ForgotPinScreen() {
 
       // Check if user exists
       const userExists = auth.currentUser?.phoneNumber === formattedPhone;
-      
+
       if (!userExists) {
-        showError('Account Not Found', 'No account found with this phone number');
+        showError(
+          "Account Not Found",
+          "No account found with this phone number",
+        );
         return;
       }
 
       // Send OTP
       const result = await sendPhoneOTP(formattedPhone);
       setConfirmationResult(result);
-      setCurrentStep('otp');
-      showSuccess('OTP Sent', 'Verification code sent to your phone');
+      setCurrentStep("otp");
+      showSuccess("OTP Sent", "Verification code sent to your phone");
     } catch (error: any) {
-      console.error('Send OTP error:', error);
-      showError('Error', error.message || 'Failed to send OTP');
+      console.error("Send OTP error:", error);
+      showError("Error", error.message || "Failed to send OTP");
     } finally {
       setLoading(false);
     }
@@ -106,22 +109,22 @@ export default function ForgotPinScreen() {
     }
 
     // Auto-submit when all filled
-    if (newOtp.every((digit) => digit !== '') && index === 5) {
-      handleVerifyOTP(newOtp.join(''));
+    if (newOtp.every((digit) => digit !== "") && index === 5) {
+      handleVerifyOTP(newOtp.join(""));
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handleVerifyOTP = async (code?: string) => {
-    const otpCode = code || otp.join('');
-    
+    const otpCode = code || otp.join("");
+
     if (otpCode.length !== 6) {
-      showError('Invalid OTP', 'Please enter all 6 digits');
+      showError("Invalid OTP", "Please enter all 6 digits");
       return;
     }
 
@@ -130,21 +133,21 @@ export default function ForgotPinScreen() {
 
       // Verify OTP
       await verifyOTP(confirmationResult, otpCode);
-      
-      setCurrentStep('complete');
-      showSuccess('Verified', 'OTP verified successfully');
+
+      setCurrentStep("complete");
+      showSuccess("Verified", "OTP verified successfully");
 
       // Navigate to PIN setup after short delay
       setTimeout(() => {
         router.replace({
-          pathname: '/(auth)/pin-setup',
-          params: { isReset: 'true' }
+          pathname: "/(auth)/pin-setup",
+          params: { isReset: "true" },
         });
       }, 1500);
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      showError('Verification Failed', 'Invalid OTP code. Please try again.');
-      setOtp(['', '', '', '', '', '']);
+      console.error("OTP verification error:", error);
+      showError("Verification Failed", "Invalid OTP code. Please try again.");
+      setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
@@ -158,17 +161,17 @@ export default function ForgotPinScreen() {
       setLoading(true);
       setCanResend(false);
       setResendTimer(60);
-      
+
       const formattedPhone = `+234${phone}`;
       const result = await sendPhoneOTP(formattedPhone);
       setConfirmationResult(result);
-      
-      showSuccess('OTP Sent', 'A new code has been sent');
-      setOtp(['', '', '', '', '', '']);
+
+      showSuccess("OTP Sent", "A new code has been sent");
+      setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } catch (error: any) {
-      console.error('Resend OTP error:', error);
-      showError('Error', 'Failed to resend OTP');
+      console.error("Resend OTP error:", error);
+      showError("Error", "Failed to resend OTP");
       setCanResend(true);
     } finally {
       setLoading(false);
@@ -178,7 +181,7 @@ export default function ForgotPinScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     scrollContent: {
       flexGrow: 1,
@@ -187,18 +190,18 @@ export default function ForgotPinScreen() {
       paddingBottom: spacing.xl,
     },
     header: {
-      marginBottom: spacing['2xl'],
+      marginBottom: spacing.xxl,
     },
     title: {
-      fontSize: typography.sizes['3xl'],
+      fontSize: typography.sizes["3xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     phoneNumber: {
@@ -209,38 +212,38 @@ export default function ForgotPinScreen() {
       marginBottom: spacing.xl,
     },
     otpContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: spacing['2xl'],
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: spacing.xxl,
     },
     otpInput: {
       width: 50,
       height: 60,
       borderWidth: 2,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
       borderRadius: borderRadius.md,
-      textAlign: 'center',
-      fontSize: typography.sizes['2xl'],
+      textAlign: "center",
+      fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
-      backgroundColor: colors.surface.light,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
     },
     otpInputFilled: {
       borderColor: colors.primary,
     },
     resendContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       marginBottom: spacing.xl,
     },
     resendText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginBottom: spacing.sm,
     },
     resendButton: {
       paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
     },
     resendButtonText: {
       fontSize: typography.sizes.base,
@@ -251,36 +254,36 @@ export default function ForgotPinScreen() {
       opacity: 0.5,
     },
     successContainer: {
-      alignItems: 'center',
-      paddingVertical: spacing['3xl'],
+      alignItems: "center",
+      paddingVertical: spacing.xxl,
     },
     successIcon: {
       width: 80,
       height: 80,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.status.successLight,
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: colors.success,
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: spacing.lg,
     },
     successText: {
       fontSize: typography.sizes.xl,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.status.success,
-      textAlign: 'center',
+      color: colors.success,
+      textAlign: "center",
     },
     footer: {
-      marginTop: 'auto',
+      marginTop: "auto",
     },
     backButton: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: spacing.sm,
-      marginTop: spacing.base,
+      marginTop: spacing.md,
     },
     backButtonText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
   });
 
@@ -298,14 +301,14 @@ export default function ForgotPinScreen() {
           label="Phone Number"
           value={phone}
           onChangeText={(text) => {
-            const cleaned = text.replace(/\D/g, '');
+            const cleaned = text.replace(/\D/g, "");
             setPhone(cleaned);
-            setPhoneError('');
+            setPhoneError("");
           }}
           placeholder="8012345678"
           error={phoneError}
           keyboardType="phone-pad"
-          leftIcon={<Phone size={20} color={colors.text.tertiary} />}
+          leftIcon={<Phone size={20} color={colors.textMuted} />}
           maxLength={10}
         />
       </View>
@@ -336,7 +339,7 @@ export default function ForgotPinScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Enter Verification Code</Text>
         <Text style={styles.subtitle}>
-          We sent a 6-digit code to{' '}
+          We sent a 6-digit code to{" "}
           <Text style={styles.phoneNumber}>+234{phone}</Text>
         </Text>
       </View>
@@ -348,10 +351,7 @@ export default function ForgotPinScreen() {
             ref={(ref) => {
               inputRefs.current[index] = ref;
             }}
-            style={[
-              styles.otpInput,
-              digit && styles.otpInputFilled,
-            ]}
+            style={[styles.otpInput, digit && styles.otpInputFilled]}
             value={digit}
             onChangeText={(value) => handleOtpChange(value, index)}
             onKeyPress={(e) => handleKeyPress(e, index)}
@@ -366,7 +366,9 @@ export default function ForgotPinScreen() {
 
       <View style={styles.resendContainer}>
         <Text style={styles.resendText}>
-          {canResend ? "Didn't receive code?" : `Resend code in ${resendTimer}s`}
+          {canResend
+            ? "Didn't receive code?"
+            : `Resend code in ${resendTimer}s`}
         </Text>
         <TouchableOpacity
           style={[
@@ -394,8 +396,8 @@ export default function ForgotPinScreen() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            setCurrentStep('phone');
-            setOtp(['', '', '', '', '', '']);
+            setCurrentStep("phone");
+            setOtp(["", "", "", "", "", ""]);
             setResendTimer(60);
             setCanResend(false);
           }}
@@ -417,20 +419,20 @@ export default function ForgotPinScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {currentStep === 'phone' && renderPhoneStep()}
-          {currentStep === 'otp' && renderOTPStep()}
-          {currentStep === 'complete' && renderCompleteStep()}
+          {currentStep === "phone" && renderPhoneStep()}
+          {currentStep === "otp" && renderOTPStep()}
+          {currentStep === "complete" && renderCompleteStep()}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

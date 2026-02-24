@@ -1,6 +1,6 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Tabs } from 'expo-router';
-import { History, Home, User } from 'lucide-react-native';
+import { useTheme } from "@/hooks/useTheme";
+import { Tabs } from "expo-router";
+import { History, Home, User } from "lucide-react-native";
 
 export default function PassengerLayout() {
   const { colors, typography } = useTheme();
@@ -10,10 +10,10 @@ export default function PassengerLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text.tertiary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: colors.surface.light,
-          borderTopColor: colors.border.light,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
@@ -27,21 +27,23 @@ export default function PassengerLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => <History size={size} color={color} />,
+          title: "History",
+          tabBarIcon: ({ color, size }) => (
+            <History size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />

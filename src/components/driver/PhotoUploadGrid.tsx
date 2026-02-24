@@ -1,7 +1,7 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Camera, Trash2 } from 'lucide-react-native';
-import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from "@/hooks/useTheme";
+import { Camera, Trash2 } from "lucide-react-native";
+import React from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface ImageUpload {
   uri: string;
@@ -31,17 +31,17 @@ export const PhotoUploadGrid: React.FC<PhotoUploadGridProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
     },
     label: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginBottom: spacing.sm,
     },
     grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: spacing.md,
     },
     photoBox: {
@@ -49,33 +49,33 @@ export const PhotoUploadGrid: React.FC<PhotoUploadGridProps> = ({
       height: 100,
       borderRadius: borderRadius.md,
       borderWidth: 2,
-      borderColor: colors.border.light,
-      borderStyle: 'dashed',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.background.gray,
+      borderColor: colors.border,
+      borderStyle: "dashed",
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.backgroundAlt,
     },
     photoContainer: {
-      position: 'relative',
+      position: "relative",
       width: 100,
       height: 100,
     },
     photo: {
-      width: '100%',
-      height: '100%',
+      width: "100%",
+      height: "100%",
       borderRadius: borderRadius.md,
     },
     removeButton: {
-      position: 'absolute',
+      position: "absolute",
       top: 4,
       right: 4,
-      backgroundColor: colors.status.error,
+      backgroundColor: colors.error,
       borderRadius: borderRadius.full,
       padding: spacing.xs,
     },
     error: {
       fontSize: typography.sizes.sm,
-      color: colors.status.error,
+      color: colors.error,
       marginTop: spacing.xs,
       marginLeft: spacing.xs,
     },
@@ -92,13 +92,13 @@ export const PhotoUploadGrid: React.FC<PhotoUploadGridProps> = ({
               style={styles.removeButton}
               onPress={() => onRemovePhoto(index)}
             >
-              <Trash2 size={16} color={colors.text.inverse} />
+              <Trash2 size={16} color={colors.textInverse} />
             </TouchableOpacity>
           </View>
         ))}
         {photos.length < maxPhotos && (
           <TouchableOpacity style={styles.photoBox} onPress={onAddPhoto}>
-            <Camera size={24} color={colors.text.tertiary} />
+            <Camera size={24} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>

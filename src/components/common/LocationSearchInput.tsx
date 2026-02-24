@@ -1,9 +1,9 @@
-import { useTheme } from '@/hooks/useTheme';
-import { getPlaceDetails, searchPlaces } from '@/services/placesService';
-import { PlaceAutocompleteResult, PlaceDetails } from '@/types/places';
-import { showError } from '@/utils/toast';
-import { MapPin, Search, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useTheme } from "@/hooks/useTheme";
+import { getPlaceDetails, searchPlaces } from "@/services/placesService";
+import { PlaceAutocompleteResult, PlaceDetails } from "@/types/places";
+import { showError } from "@/utils/toast";
+import { MapPin, Search, X } from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
 interface LocationSearchInputProps {
   placeholder?: string;
@@ -23,7 +23,7 @@ interface LocationSearchInputProps {
 
 /**
  * Location Search Input with Google Places Autocomplete
- * 
+ *
  * Features:
  * - Real-time autocomplete suggestions
  * - Debounced API calls
@@ -32,12 +32,12 @@ interface LocationSearchInputProps {
  * - Clear button
  */
 export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
-  placeholder = 'Search location...',
+  placeholder = "Search location...",
   onLocationSelect,
-  initialValue = '',
+  initialValue = "",
 }) => {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
-  
+
   const [query, setQuery] = useState<string>(initialValue);
   const [suggestions, setSuggestions] = useState<PlaceAutocompleteResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -55,24 +55,26 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
     setLoading(true);
     setSearchError(null);
-    
+
     const timer = setTimeout(async () => {
       try {
         const results = await searchPlaces({ input: query });
         setSuggestions(results);
         setShowSuggestions(true);
-        
+
         if (results.length === 0) {
-          setSearchError('No locations found');
+          setSearchError("No locations found");
         }
       } catch (err) {
-        console.error('Search error:', err);
-        const errorMessage = err instanceof Error 
-          ? err.message 
-          : 'Failed to search locations';
+        console.error("Search error:", err);
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to search locations";
         setSearchError(errorMessage);
         setSuggestions([]);
-        showError('Search Failed', 'Unable to search locations. Please check your connection and try again.');
+        showError(
+          "Search Failed",
+          "Unable to search locations. Please check your connection and try again.",
+        );
       } finally {
         setLoading(false);
       }
@@ -81,29 +83,31 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
     return () => clearTimeout(timer);
   }, [query]);
 
-  const handleSelectSuggestion = useCallback(async (suggestion: PlaceAutocompleteResult): Promise<void> => {
-    try {
-      setLoading(true);
-      setQuery(suggestion.mainText);
-      setShowSuggestions(false);
-      setSearchError(null);
+  const handleSelectSuggestion = useCallback(
+    async (suggestion: PlaceAutocompleteResult): Promise<void> => {
+      try {
+        setLoading(true);
+        setQuery(suggestion.mainText);
+        setShowSuggestions(false);
+        setSearchError(null);
 
-      const details = await getPlaceDetails(suggestion.placeId);
-      onLocationSelect(details);
-    } catch (err) {
-      console.error('Error getting place details:', err);
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to get location details';
-      showError('Error', errorMessage);
-      setSearchError('Failed to select location');
-    } finally {
-      setLoading(false);
-    }
-  }, [onLocationSelect]);
+        const details = await getPlaceDetails(suggestion.placeId);
+        onLocationSelect(details);
+      } catch (err) {
+        console.error("Error getting place details:", err);
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to get location details";
+        showError("Error", errorMessage);
+        setSearchError("Failed to select location");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onLocationSelect],
+  );
 
   const handleClear = useCallback((): void => {
-    setQuery('');
+    setQuery("");
     setSuggestions([]);
     setShowSuggestions(false);
     setSearchError(null);
@@ -117,22 +121,22 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      position: 'relative',
+      position: "relative",
       zIndex: 1000,
     },
     inputContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.md,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
       paddingVertical: spacing.md,
       borderWidth: 1,
-      borderColor: searchError 
-        ? colors.status.error 
-        : showSuggestions 
-        ? colors.border.focus 
-        : colors.border.light,
+      borderColor: searchError
+        ? colors.error
+        : showSuggestions
+          ? colors.borderFocus
+          : colors.border,
       ...shadows.small,
     },
     searchIcon: {
@@ -142,7 +146,7 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
       flex: 1,
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.primary,
+      color: colors.textPrimary,
     },
     clearButton: {
       padding: spacing.xs,
@@ -151,24 +155,24 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
       padding: spacing.xs,
     },
     suggestionsContainer: {
-      position: 'absolute',
-      top: '100%',
+      position: "absolute",
+      top: "100%",
       left: 0,
       right: 0,
       marginTop: spacing.xs,
-      backgroundColor: colors.surface.light,
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
       maxHeight: 300,
       ...shadows.medium,
     },
     suggestionItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      padding: spacing.md,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
+      borderBottomColor: colors.border,
     },
     suggestionItemLast: {
       borderBottomWidth: 0,
@@ -182,89 +186,104 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
     suggestionMainText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs / 2,
     },
     suggestionSecondaryText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     emptyContainer: {
       padding: spacing.lg,
-      alignItems: 'center',
+      alignItems: "center",
     },
     emptyText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: searchError ? colors.status.error : colors.text.secondary,
+      color: searchError ? colors.error : colors.textSecondary,
     },
     errorHint: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.tertiary,
+      color: colors.textMuted,
       marginTop: spacing.xs,
-      textAlign: 'center',
+      textAlign: "center",
     },
   });
 
-  const renderSuggestionItem: ListRenderItem<PlaceAutocompleteResult> = useCallback(({ item, index }) => {
-    const isLast = index === suggestions.length - 1;
-    
-    return (
-      <TouchableOpacity
-        style={[
-          styles.suggestionItem,
-          isLast && styles.suggestionItemLast,
-        ]}
-        onPress={() => handleSelectSuggestion(item)}
-        activeOpacity={0.7}
-        disabled={loading}
-      >
-        <MapPin
-          size={20}
-          color={colors.text.tertiary}
-          style={styles.suggestionIcon}
-        />
-        <View style={styles.suggestionTextContainer}>
-          <Text style={styles.suggestionMainText}>{item.mainText}</Text>
-          {item.secondaryText && (
-            <Text style={styles.suggestionSecondaryText}>
-              {item.secondaryText}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  }, [loading, suggestions.length, handleSelectSuggestion, colors.text.tertiary, styles.suggestionItem, styles.suggestionItemLast, styles.suggestionIcon, styles.suggestionTextContainer, styles.suggestionMainText, styles.suggestionSecondaryText]);
+  const renderSuggestionItem: ListRenderItem<PlaceAutocompleteResult> =
+    useCallback(
+      ({ item, index }) => {
+        const isLast = index === suggestions.length - 1;
 
-  const renderEmptyComponent = useCallback((): React.JSX.Element => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>
-        {searchError || 'No locations found'}
-      </Text>
-      {searchError && (
-        <Text style={styles.errorHint}>
-          Check your internet connection and try again
+        return (
+          <TouchableOpacity
+            style={[styles.suggestionItem, isLast && styles.suggestionItemLast]}
+            onPress={() => handleSelectSuggestion(item)}
+            activeOpacity={0.7}
+            disabled={loading}
+          >
+            <MapPin
+              size={20}
+              color={colors.textMuted}
+              style={styles.suggestionIcon}
+            />
+            <View style={styles.suggestionTextContainer}>
+              <Text style={styles.suggestionMainText}>{item.mainText}</Text>
+              {item.secondaryText && (
+                <Text style={styles.suggestionSecondaryText}>
+                  {item.secondaryText}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      },
+      [
+        loading,
+        suggestions.length,
+        handleSelectSuggestion,
+        colors.textMuted,
+        styles.suggestionItem,
+        styles.suggestionItemLast,
+        styles.suggestionIcon,
+        styles.suggestionTextContainer,
+        styles.suggestionMainText,
+        styles.suggestionSecondaryText,
+      ],
+    );
+
+  const renderEmptyComponent = useCallback(
+    (): React.JSX.Element => (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {searchError || "No locations found"}
         </Text>
-      )}
-    </View>
-  ), [searchError, styles.emptyContainer, styles.emptyText, styles.errorHint]);
+        {searchError && (
+          <Text style={styles.errorHint}>
+            Check your internet connection and try again
+          </Text>
+        )}
+      </View>
+    ),
+    [searchError, styles.emptyContainer, styles.emptyText, styles.errorHint],
+  );
 
   return (
     <View style={styles.container}>
       {/* Search Input */}
       <View style={styles.inputContainer}>
-        <Search 
-          size={20} 
-          color={searchError ? colors.status.error : colors.text.tertiary} 
-          style={styles.searchIcon} 
+        <Search
+          size={20}
+          color={searchError ? colors.error : colors.textMuted}
+          style={styles.searchIcon}
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={colors.text.tertiary}
+          placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={setQuery}
           autoCapitalize="none"
@@ -281,7 +300,7 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
         {query.length > 0 && !loading && (
           <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <X size={20} color={colors.text.tertiary} />
+            <X size={20} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>

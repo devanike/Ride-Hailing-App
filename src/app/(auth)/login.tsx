@@ -1,9 +1,7 @@
-// src/app/(auth)/login.tsx
-
-import { Button } from '@/components/common/Button';
-import { Input } from '@/components/common/Input';
-import { PINPad } from '@/components/common/PinPad';
-import { useTheme } from '@/hooks/useTheme';
+import { Button } from "@/components/common/Button";
+import { Input } from "@/components/common/Input";
+import { PINPad } from "@/components/common/PinPad";
+import { useTheme } from "@/hooks/useTheme";
 import {
   authenticateWithBiometric,
   getBiometricCapability,
@@ -14,11 +12,11 @@ import {
   resetFailedAttempts,
   trackFailedAttempt,
   verifyPIN,
-} from '@/services/securityService';
-import { showError, showSuccess } from '@/utils/toast';
-import { router } from 'expo-router';
-import { Phone } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+} from "@/services/securityService";
+import { showError, showSuccess } from "@/utils/toast";
+import { router } from "expo-router";
+import { Phone } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -28,18 +26,18 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
-  
+
   // States
-  const [phone, setPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  
+
   // PIN/Biometric states
   const [hasPinStored, setHasPinStored] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -49,7 +47,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     checkAuthStatus();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update lockout timer
@@ -105,7 +103,7 @@ export default function LoginScreen() {
         }
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error("Auth check error:", error);
     } finally {
       setCheckingAuth(false);
     }
@@ -119,14 +117,17 @@ export default function LoginScreen() {
         handleLoginSuccess();
       }
     } catch (error: any) {
-      console.error('Biometric auth error:', error);
+      console.error("Biometric auth error:", error);
       // User can still use PIN
     }
   };
 
   const handlePINComplete = async (pin: string) => {
     if (isLocked) {
-      showError('Account Locked', `Try again in ${Math.ceil(lockoutTime / 60)} minutes`);
+      showError(
+        "Account Locked",
+        `Try again in ${Math.ceil(lockoutTime / 60)} minutes`,
+      );
       return;
     }
 
@@ -140,16 +141,19 @@ export default function LoginScreen() {
       } else {
         setPinError(true);
         await trackFailedAttempt();
-        
+
         // Check if locked after failed attempt
         const locked = await isAccountLocked();
         if (locked) {
           const remaining = await getRemainingLockoutTime();
           setIsLocked(true);
           setLockoutTime(remaining);
-          showError('Account Locked', `Too many failed attempts. Try again in ${Math.ceil(remaining / 60)} minutes`);
+          showError(
+            "Account Locked",
+            `Too many failed attempts. Try again in ${Math.ceil(remaining / 60)} minutes`,
+          );
         } else {
-          showError('Invalid PIN', 'Please try again');
+          showError("Invalid PIN", "Please try again");
         }
 
         setTimeout(() => {
@@ -157,34 +161,34 @@ export default function LoginScreen() {
         }, 500);
       }
     } catch (error: any) {
-      console.error('PIN verification error:', error);
-      showError('Login Failed', error.message || 'Failed to verify PIN');
+      console.error("PIN verification error:", error);
+      showError("Login Failed", error.message || "Failed to verify PIN");
     } finally {
       setLoading(false);
     }
   };
 
   const handleLoginSuccess = () => {
-    showSuccess('Welcome Back', 'Login successful');
-    
+    showSuccess("Welcome Back", "Login successful");
+
     // TODO: Navigate based on user type from Firestore
     // Passenger → /(passenger)
     // Driver → /(driver)
     // Admin → /(admin)
-    router.replace('/(auth)/welcome'); // Temporary
+    router.replace("/(auth)/welcome"); // Temporary
   };
 
   const handlePhoneLogin = async () => {
     if (!phone.trim()) {
-      setPhoneError('Phone number is required');
+      setPhoneError("Phone number is required");
       return;
     }
     if (phone.length !== 10) {
-      setPhoneError('Phone number must be 10 digits');
+      setPhoneError("Phone number must be 10 digits");
       return;
     }
     if (!/^\d+$/.test(phone)) {
-      setPhoneError('Phone number must contain only digits');
+      setPhoneError("Phone number must contain only digits");
       return;
     }
 
@@ -194,15 +198,15 @@ export default function LoginScreen() {
 
       // Navigate to OTP verification for phone login
       router.push({
-        pathname: '/(auth)/otp-verification',
+        pathname: "/(auth)/otp-verification",
         params: {
           phone: formattedPhone,
-          isLogin: 'true',
+          isLogin: "true",
         },
       });
     } catch (error: any) {
-      console.error('Phone login error:', error);
-      showError('Login Failed', error.message || 'Failed to send OTP');
+      console.error("Phone login error:", error);
+      showError("Login Failed", error.message || "Failed to send OTP");
     } finally {
       setLoading(false);
     }
@@ -211,13 +215,13 @@ export default function LoginScreen() {
   const formatLockoutTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     scrollContent: {
       flexGrow: 1,
@@ -226,44 +230,44 @@ export default function LoginScreen() {
       paddingBottom: spacing.xl,
     },
     header: {
-      marginBottom: spacing['2xl'],
+      marginBottom: spacing.xxl,
     },
     title: {
-      fontSize: typography.sizes['3xl'],
+      fontSize: typography.sizes["3xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     pinContainer: {
       marginTop: spacing.xl,
     },
     lockoutContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       padding: spacing.xl,
-      backgroundColor: colors.status.errorLight,
+      backgroundColor: colors.error,
       borderRadius: borderRadius.lg,
       marginBottom: spacing.xl,
     },
     lockoutText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.status.error,
-      textAlign: 'center',
+      color: colors.error,
+      textAlign: "center",
       marginBottom: spacing.sm,
     },
     lockoutTimer: {
-      fontSize: typography.sizes['2xl'],
+      fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.status.error,
+      color: colors.error,
     },
     forgotPinButton: {
-      alignItems: 'center',
+      alignItems: "center",
       marginTop: spacing.lg,
       paddingVertical: spacing.sm,
     },
@@ -273,37 +277,37 @@ export default function LoginScreen() {
       color: colors.primary,
     },
     divider: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       marginVertical: spacing.xl,
     },
     dividerLine: {
       flex: 1,
       height: 1,
-      backgroundColor: colors.border.light,
+      backgroundColor: colors.border,
     },
     dividerText: {
-      marginHorizontal: spacing.base,
+      marginHorizontal: spacing.md,
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     phoneLoginSection: {
-      marginTop: spacing.base,
+      marginTop: spacing.md,
     },
     footer: {
-      marginTop: 'auto',
-      alignItems: 'center',
+      marginTop: "auto",
+      alignItems: "center",
     },
     signupPrompt: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: spacing.md,
     },
     signupPromptText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     signupLink: {
       fontSize: typography.sizes.sm,
@@ -316,7 +320,9 @@ export default function LoginScreen() {
   if (checkingAuth) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={styles.subtitle}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -324,11 +330,11 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -340,8 +346,8 @@ export default function LoginScreen() {
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
               {hasPinStored
-                ? 'Enter your PIN to continue'
-                : 'Enter your phone number to login'}
+                ? "Enter your PIN to continue"
+                : "Enter your phone number to login"}
             </Text>
           </View>
 
@@ -364,7 +370,9 @@ export default function LoginScreen() {
                 <PINPad
                   length={6}
                   onComplete={handlePINComplete}
-                  onBiometric={biometricEnabled ? handleBiometricAuth : undefined}
+                  onBiometric={
+                    biometricEnabled ? handleBiometricAuth : undefined
+                  }
                   error={pinError}
                   loading={loading}
                   showBiometric={biometricEnabled && !isLocked}
@@ -376,7 +384,7 @@ export default function LoginScreen() {
               {/* Forgot PIN */}
               <TouchableOpacity
                 style={styles.forgotPinButton}
-                onPress={() => router.push('/(auth)/forgot-pin')}
+                onPress={() => router.push("/(auth)/forgot-pin")}
               >
                 <Text style={styles.forgotPinText}>Forgot PIN?</Text>
               </TouchableOpacity>
@@ -394,14 +402,14 @@ export default function LoginScreen() {
                   label="Login with Phone Number"
                   value={phone}
                   onChangeText={(text) => {
-                    const cleaned = text.replace(/\D/g, '');
+                    const cleaned = text.replace(/\D/g, "");
                     setPhone(cleaned);
-                    setPhoneError('');
+                    setPhoneError("");
                   }}
                   placeholder="8012345678"
                   error={phoneError}
                   keyboardType="phone-pad"
-                  leftIcon={<Phone size={20} color={colors.text.tertiary} />}
+                  leftIcon={<Phone size={20} color={colors.textMuted} />}
                   maxLength={10}
                 />
                 <Button
@@ -423,14 +431,14 @@ export default function LoginScreen() {
                 label="Phone Number"
                 value={phone}
                 onChangeText={(text) => {
-                  const cleaned = text.replace(/\D/g, '');
+                  const cleaned = text.replace(/\D/g, "");
                   setPhone(cleaned);
-                  setPhoneError('');
+                  setPhoneError("");
                 }}
                 placeholder="8012345678"
                 error={phoneError}
                 keyboardType="phone-pad"
-                leftIcon={<Phone size={20} color={colors.text.tertiary} />}
+                leftIcon={<Phone size={20} color={colors.textMuted} />}
                 maxLength={10}
               />
 
@@ -450,8 +458,10 @@ export default function LoginScreen() {
 
           {/* Signup Prompt */}
           <View style={styles.signupPrompt}>
-            <Text style={styles.signupPromptText}>Don&apos;t have an account?</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <Text style={styles.signupPromptText}>
+              Don&apos;t have an account?
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>

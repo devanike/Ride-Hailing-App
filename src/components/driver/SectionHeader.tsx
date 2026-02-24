@@ -1,13 +1,16 @@
-import { useTheme } from '@/hooks/useTheme';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useTheme } from "@/hooks/useTheme";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 interface SectionHeaderProps {
   title: string;
   style?: any;
 }
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, style }) => {
+export const SectionHeader: React.FC<SectionHeaderProps> = ({
+  title,
+  style,
+}) => {
   const { colors, typography, spacing } = useTheme();
 
   const styles = StyleSheet.create({
@@ -17,7 +20,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, style }) =>
     title: {
       fontSize: typography.sizes.lg,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
+      color: colors.textPrimary,
     },
   });
 

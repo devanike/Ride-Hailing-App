@@ -1,9 +1,15 @@
-export type CloudinaryFolder = 
-  | 'profile_photos'
-  | 'driver_licenses'
-  | 'vehicle_registrations'
-  | 'vehicle_photos'
-  | 'report_evidence';
+export type CloudinaryFolder =
+  | "profile_photos"
+  | "driver_licenses"
+  | "vehicle_photos"
+  | "report_evidence";
+
+export interface ImageUpload {
+  uri: string;
+  uploading: boolean;
+  uploaded: boolean;
+  cloudinaryUrl?: string;
+}
 
 export interface CloudinaryUploadResponse {
   public_id: string;

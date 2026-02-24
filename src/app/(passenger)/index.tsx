@@ -1,22 +1,22 @@
-import { Button } from '@/components/common/Button';
-import { ErrorMessage } from '@/components/common/ErrorMessage';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { MapComponent, MapComponentRef } from '@/components/map/MapComponent';
-import { useLocation } from '@/hooks/useLocation';
-import { useTheme } from '@/hooks/useTheme';
-import { showError } from '@/utils/toast';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { router, useLocalSearchParams } from 'expo-router';
-import { MapPin, Navigation, Search } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { ErrorMessage } from "@/components/common/ErrorMessage";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { MapComponent, MapComponentRef } from "@/components/map/MapComponent";
+import { useLocation } from "@/hooks/useLocation";
+import { useTheme } from "@/hooks/useTheme";
+import { showError } from "@/utils/toast";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { router, useLocalSearchParams } from "expo-router";
+import { MapPin, Navigation, Search } from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
  * Passenger Home Screen
@@ -26,23 +26,24 @@ export default function PassengerHomeScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
-  
-  const { location, loading, error, hasPermission, requestPermission } = useLocation();
-  
-  const [pickupLocation, setPickupLocation] = useState<string>('');
-  const [dropoffLocation, setDropoffLocation] = useState<string>('');
+
+  const { location, loading, error, hasPermission, requestPermission } =
+    useLocation();
+
+  const [pickupLocation, setPickupLocation] = useState<string>("");
+  const [dropoffLocation, setDropoffLocation] = useState<string>("");
 
   // Get location data returned from location-selection screen
   const params = useLocalSearchParams();
   const selectedLocation = params.selectedLocation as string | undefined;
-  const locationType = params.locationType as 'pickup' | 'dropoff' | undefined;
+  const locationType = params.locationType as "pickup" | "dropoff" | undefined;
 
   // Handle returned location from location-selection screen
   useEffect(() => {
     if (selectedLocation && locationType) {
-      if (locationType === 'pickup') {
+      if (locationType === "pickup") {
         setPickupLocation(selectedLocation);
-      } else if (locationType === 'dropoff') {
+      } else if (locationType === "dropoff") {
         setDropoffLocation(selectedLocation);
       }
     }
@@ -59,10 +60,10 @@ export default function PassengerHomeScreen(): React.JSX.Element {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          300
+          300,
         );
       } catch (err) {
-        console.error('Error animating to location:', err);
+        console.error("Error animating to location:", err);
       }
     }
   }, [location]);
@@ -73,49 +74,53 @@ export default function PassengerHomeScreen(): React.JSX.Element {
         await requestPermission();
       }
     } catch (err) {
-      console.error('Error requesting location permission:', err);
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to request location permission';
-      showError('Permission Error', errorMessage);
+      console.error("Error requesting location permission:", err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to request location permission";
+      showError("Permission Error", errorMessage);
     }
   }, [hasPermission, requestPermission]);
 
   const handleSelectPickup = useCallback((): void => {
     try {
       router.push({
-        pathname: '/location-selection',
-        params: { type: 'pickup' },
+        pathname: "/location-selection",
+        params: { type: "pickup" },
       });
     } catch (err) {
-      console.error('Navigation error:', err);
-      showError('Error', 'Failed to open location selection');
+      console.error("Navigation error:", err);
+      showError("Error", "Failed to open location selection");
     }
   }, []);
 
   const handleSelectDropoff = useCallback((): void => {
     try {
       router.push({
-        pathname: '/location-selection',
-        params: { type: 'dropoff' },
+        pathname: "/location-selection",
+        params: { type: "dropoff" },
       });
     } catch (err) {
-      console.error('Navigation error:', err);
-      showError('Error', 'Failed to open location selection');
+      console.error("Navigation error:", err);
+      showError("Error", "Failed to open location selection");
     }
   }, []);
 
   const handleRequestRide = useCallback((): void => {
     if (!pickupLocation || !dropoffLocation) {
-      showError('Incomplete Information', 'Please select both pickup and dropoff locations');
+      showError(
+        "Incomplete Information",
+        "Please select both pickup and dropoff locations",
+      );
       return;
     }
-    
+
     try {
-      router.push('/(passenger)/driver-offers');
+      router.push("/(passenger)/driver-offers");
     } catch (err) {
-      console.error('Navigation error:', err);
-      showError('Error', 'Failed to find drivers. Please try again.');
+      console.error("Navigation error:", err);
+      showError("Error", "Failed to find drivers. Please try again.");
     }
   }, [pickupLocation, dropoffLocation]);
 
@@ -123,11 +128,10 @@ export default function PassengerHomeScreen(): React.JSX.Element {
     try {
       await requestPermission();
     } catch (err) {
-      console.error('Retry location error:', err);
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to get location';
-      showError('Error', errorMessage);
+      console.error("Retry location error:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to get location";
+      showError("Error", errorMessage);
     }
   }, [requestPermission]);
 
@@ -141,57 +145,57 @@ export default function PassengerHomeScreen(): React.JSX.Element {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          300
+          300,
         );
       } catch (err) {
-        console.error('Error centering map:', err);
-        showError('Error', 'Failed to center map on your location');
+        console.error("Error centering map:", err);
+        showError("Error", "Failed to center map on your location");
       }
     } else {
-      showError('Location Unavailable', 'Unable to get your current location');
+      showError("Location Unavailable", "Unable to get your current location");
     }
   }, [location]);
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     map: {
       flex: 1,
     },
     header: {
-      position: 'absolute',
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       paddingTop: spacing.xl,
       paddingHorizontal: spacing.screenPadding,
-      paddingBottom: spacing.base,
-      backgroundColor: colors.surface.light,
+      paddingBottom: spacing.md,
+      backgroundColor: colors.surface,
       ...shadows.medium,
     },
     greeting: {
       fontSize: typography.sizes.xl,
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
     },
     subGreeting: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginTop: spacing.xs / 2,
     },
     myLocationButton: {
-      position: 'absolute',
+      position: "absolute",
       top: 140,
       right: spacing.screenPadding,
       width: 48,
       height: 48,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.surface.light,
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
       ...shadows.medium,
     },
     bottomSheetContent: {
@@ -200,24 +204,24 @@ export default function PassengerHomeScreen(): React.JSX.Element {
     sheetTitle: {
       fontSize: typography.sizes.xl,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.lg,
     },
     locationInputContainer: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
     },
     locationInput: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
-      padding: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      padding: spacing.md,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
     },
     locationInputFilled: {
       borderColor: colors.primary,
-      backgroundColor: colors.primary + '10',
+      backgroundColor: colors.primary + "10",
     },
     locationIcon: {
       marginRight: spacing.md,
@@ -228,42 +232,42 @@ export default function PassengerHomeScreen(): React.JSX.Element {
     locationLabel: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.tertiary,
+      color: colors.textMuted,
       marginBottom: spacing.xs / 2,
     },
     locationText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     locationTextFilled: {
-      color: colors.text.primary,
+      color: colors.textPrimary,
       fontFamily: typography.fonts.bodyMedium,
     },
     divider: {
       height: 1,
-      backgroundColor: colors.border.light,
+      backgroundColor: colors.border,
       marginVertical: spacing.md,
     },
     requestButton: {
-      marginTop: spacing.base,
+      marginTop: spacing.md,
     },
     permissionContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       padding: spacing.xl,
     },
     permissionText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
-      textAlign: 'center',
+      color: colors.textSecondary,
+      textAlign: "center",
       marginBottom: spacing.lg,
-      marginTop: spacing.base,
+      marginTop: spacing.md,
     },
     errorContainer: {
-      position: 'absolute',
+      position: "absolute",
       top: 100,
       left: spacing.screenPadding,
       right: spacing.screenPadding,
@@ -274,12 +278,13 @@ export default function PassengerHomeScreen(): React.JSX.Element {
   // Show permission request if needed
   if (!hasPermission) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.permissionContainer}>
-          <MapPin size={64} color={colors.text.tertiary} />
+          <MapPin size={64} color={colors.textMuted} />
           <Text style={styles.permissionText}>
-            We need your location to show nearby drivers and enable ride tracking.
+            We need your location to show nearby drivers and enable ride
+            tracking.
           </Text>
           <Button
             title="Enable Location"
@@ -297,7 +302,7 @@ export default function PassengerHomeScreen(): React.JSX.Element {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* Map */}
       <MapComponent
         ref={mapRef}
@@ -329,19 +334,22 @@ export default function PassengerHomeScreen(): React.JSX.Element {
         onPress={handleCenterMap}
         disabled={!location}
       >
-        <Navigation size={24} color={location ? colors.primary : colors.text.tertiary} />
+        <Navigation
+          size={24}
+          color={location ? colors.primary : colors.textMuted}
+        />
       </TouchableOpacity>
 
       {/* Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={0}
-        snapPoints={['30%', '50%', '90%']}
+        snapPoints={["30%", "50%", "90%"]}
         backgroundStyle={{
-          backgroundColor: colors.surface.light,
+          backgroundColor: colors.surface,
         }}
         handleIndicatorStyle={{
-          backgroundColor: colors.border.medium,
+          backgroundColor: colors.border,
         }}
       >
         <BottomSheetScrollView
@@ -360,7 +368,7 @@ export default function PassengerHomeScreen(): React.JSX.Element {
               onPress={handleSelectPickup}
             >
               <View style={styles.locationIcon}>
-                <MapPin size={20} color={colors.status.success} />
+                <MapPin size={20} color={colors.success} />
               </View>
               <View style={styles.locationTextContainer}>
                 <Text style={styles.locationLabel}>Pickup Location</Text>
@@ -371,10 +379,10 @@ export default function PassengerHomeScreen(): React.JSX.Element {
                   ]}
                   numberOfLines={1}
                 >
-                  {pickupLocation || 'Select pickup location'}
+                  {pickupLocation || "Select pickup location"}
                 </Text>
               </View>
-              <Search size={20} color={colors.text.tertiary} />
+              <Search size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -388,7 +396,7 @@ export default function PassengerHomeScreen(): React.JSX.Element {
               onPress={handleSelectDropoff}
             >
               <View style={styles.locationIcon}>
-                <MapPin size={20} color={colors.status.error} />
+                <MapPin size={20} color={colors.error} />
               </View>
               <View style={styles.locationTextContainer}>
                 <Text style={styles.locationLabel}>Dropoff Location</Text>
@@ -399,10 +407,10 @@ export default function PassengerHomeScreen(): React.JSX.Element {
                   ]}
                   numberOfLines={1}
                 >
-                  {dropoffLocation || 'Select dropoff location'}
+                  {dropoffLocation || "Select dropoff location"}
                 </Text>
               </View>
-              <Search size={20} color={colors.text.tertiary} />
+              <Search size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -423,7 +431,9 @@ export default function PassengerHomeScreen(): React.JSX.Element {
       </BottomSheet>
 
       {/* Loading Overlay */}
-      {loading && <LoadingSpinner fullScreen message="Getting your location..." />}
+      {loading && (
+        <LoadingSpinner fullScreen message="Getting your location..." />
+      )}
     </View>
   );
 }

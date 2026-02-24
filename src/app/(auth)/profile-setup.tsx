@@ -1,14 +1,14 @@
-import { Button } from '@/components/common/Button';
-import { Input } from '@/components/common/Input';
-import { useTheme } from '@/hooks/useTheme';
-import { auth, db } from '@/services/firebaseConfig';
-import { uploadImage } from '@/services/uploadService';
-import { showError, showSuccess } from '@/utils/toast';
-import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import { doc, updateDoc } from 'firebase/firestore';
-import { Camera, Mail, User } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { Input } from "@/components/common/Input";
+import { useTheme } from "@/hooks/useTheme";
+import { auth, db } from "@/services/firebaseConfig";
+import { uploadImage } from "@/services/uploadService";
+import { showError, showSuccess } from "@/utils/toast";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import { doc, updateDoc } from "firebase/firestore";
+import { Camera, Mail, User } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,37 +20,41 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileSetupScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [emailError, setEmailError] = useState('');
+  const [emailError, setEmailError] = useState("");
 
   const validateEmail = (email: string): boolean => {
     if (!email.trim()) return true; // Email is optional
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setEmailError('Invalid email address');
+      setEmailError("Invalid email address");
       return false;
     }
-    
-    setEmailError('');
+
+    setEmailError("");
     return true;
   };
 
   const pickImage = async () => {
     try {
       // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        showError('Permission Denied', 'Please allow access to your photo library');
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        showError(
+          "Permission Denied",
+          "Please allow access to your photo library",
+        );
         return;
       }
 
@@ -64,15 +68,18 @@ export default function ProfileSetupScreen() {
 
       if (!result.canceled && result.assets[0]) {
         setUploading(true);
-        
+
         // Upload to Cloudinary
-        const imageUrl = await uploadImage(result.assets[0].uri, 'profile_photos');
+        const imageUrl = await uploadImage(
+          result.assets[0].uri,
+          "profile_photos",
+        );
         setProfilePhoto(imageUrl);
-        showSuccess('Success', 'Photo uploaded successfully');
+        showSuccess("Success", "Photo uploaded successfully");
       }
     } catch (error: any) {
-      console.error('Image pick error:', error);
-      showError('Upload Failed', error.message || 'Failed to upload photo');
+      console.error("Image pick error:", error);
+      showError("Upload Failed", error.message || "Failed to upload photo");
     } finally {
       setUploading(false);
     }
@@ -84,26 +91,26 @@ export default function ProfileSetupScreen() {
     try {
       setLoading(true);
       const uid = auth.currentUser?.uid;
-      
+
       if (!uid) {
-        showError('Error', 'User not found. Please try again.');
+        showError("Error", "User not found. Please try again.");
         return;
       }
 
       // Update user document
-      await updateDoc(doc(db, 'users', uid), {
+      await updateDoc(doc(db, "users", uid), {
         email: email.trim() || null,
         profilePhoto: profilePhoto || null,
         updatedAt: new Date(),
       });
 
-      showSuccess('Success', 'Profile updated successfully');
-      
+      showSuccess("Success", "Profile updated successfully");
+
       // Navigate to PIN setup
-      router.push('/(auth)/pin-setup');
+      router.push("/(auth)/pin-setup");
     } catch (error: any) {
-      console.error('Profile update error:', error);
-      showError('Update Failed', error.message || 'Failed to update profile');
+      console.error("Profile update error:", error);
+      showError("Update Failed", error.message || "Failed to update profile");
     } finally {
       setLoading(false);
     }
@@ -111,13 +118,13 @@ export default function ProfileSetupScreen() {
 
   const handleSkip = () => {
     // Skip to PIN setup without updating profile
-    router.push('/(auth)/pin-setup');
+    router.push("/(auth)/pin-setup");
   };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     scrollContent: {
       flexGrow: 1,
@@ -126,52 +133,52 @@ export default function ProfileSetupScreen() {
       paddingBottom: spacing.xl,
     },
     header: {
-      marginBottom: spacing['2xl'],
+      marginBottom: spacing.xxl,
     },
     title: {
-      fontSize: typography.sizes['3xl'],
+      fontSize: typography.sizes["3xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     photoSection: {
-      alignItems: 'center',
-      marginBottom: spacing['2xl'],
+      alignItems: "center",
+      marginBottom: spacing.xxl,
     },
     photoContainer: {
       width: 120,
       height: 120,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.surface.light,
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: colors.surface,
+      justifyContent: "center",
+      alignItems: "center",
       borderWidth: 2,
-      borderColor: colors.border.light,
-      marginBottom: spacing.base,
-      overflow: 'hidden',
+      borderColor: colors.border,
+      marginBottom: spacing.md,
+      overflow: "hidden",
     },
     profileImage: {
-      width: '100%',
-      height: '100%',
+      width: "100%",
+      height: "100%",
     },
     cameraButton: {
-      position: 'absolute',
+      position: "absolute",
       bottom: 0,
       right: 0,
       width: 40,
       height: 40,
       borderRadius: borderRadius.full,
       backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       borderWidth: 3,
-      borderColor: colors.background.light,
+      borderColor: colors.background,
     },
     uploadText: {
       fontSize: typography.sizes.base,
@@ -182,26 +189,26 @@ export default function ProfileSetupScreen() {
       marginBottom: spacing.xl,
     },
     footer: {
-      marginTop: 'auto',
+      marginTop: "auto",
       gap: spacing.md,
     },
     skipButton: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: spacing.sm,
     },
     skipText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -226,19 +233,22 @@ export default function ProfileSetupScreen() {
               {uploading ? (
                 <ActivityIndicator size="large" color={colors.primary} />
               ) : profilePhoto ? (
-                <Image source={{ uri: profilePhoto }} style={styles.profileImage} />
+                <Image
+                  source={{ uri: profilePhoto }}
+                  style={styles.profileImage}
+                />
               ) : (
-                <User size={60} color={colors.text.tertiary} />
+                <User size={60} color={colors.textMuted} />
               )}
-              
+
               <View style={styles.cameraButton}>
-                <Camera size={20} color={colors.text.inverse} />
+                <Camera size={20} color={colors.textInverse} />
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={pickImage} disabled={uploading}>
               <Text style={styles.uploadText}>
-                {profilePhoto ? 'Change Photo' : 'Upload Photo'}
+                {profilePhoto ? "Change Photo" : "Upload Photo"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -250,13 +260,13 @@ export default function ProfileSetupScreen() {
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                setEmailError('');
+                setEmailError("");
               }}
               placeholder="your.email@example.com"
               error={emailError}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIcon={<Mail size={20} color={colors.text.tertiary} />}
+              leftIcon={<Mail size={20} color={colors.textMuted} />}
             />
           </View>
 

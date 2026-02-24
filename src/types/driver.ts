@@ -1,128 +1,72 @@
-/**
- * Driver Registration Types
- * TypeScript interfaces for driver registration flow
- */
+import { Timestamp } from "firebase/firestore";
 
-// Vehicle type enumeration
-export enum VehicleType {
-  SEDAN = 'sedan',
-  SUV = 'suv',
-  TRICYCLE = 'tricycle',
-  MINIBUS = 'minibus',
-}
+export type VehicleType = "car" | "tricycle" | "bus";
+export type DriverStatus = "active" | "suspended";
+export type PayoutPreference = "daily" | "weekly";
 
-// Driver status enumeration
-export enum DriverStatus {
-  INCOMPLETE = 'incomplete', // Registration not completed
-  ACTIVE = 'active',         // Can accept rides
-  INACTIVE = 'inactive',     // Voluntarily offline
-  SUSPENDED = 'suspended',   // Suspended by admin
-}
-
-// Vehicle information
-export interface VehicleInfo {
-  type: VehicleType;
-  make: string;
-  model: string;
-  year: number;
-  color: string;
-  plateNumber: string;
-  photos: string[]; // Cloudinary URLs
-}
-
-// Driver license information
-export interface LicenseInfo {
-  number: string;
-  expiryDate: Date;
-  frontPhoto: string; // Cloudinary URL
-  backPhoto: string;  // Cloudinary URL
-}
-
-// Vehicle documents
-export interface VehicleDocuments {
-  registrationNumber: string;
-  registrationPhoto: string; // Cloudinary URL
-  insurancePhoto: string;    // Cloudinary URL
-}
-
-// Bank account information
 export interface BankAccount {
   bankName: string;
   accountNumber: string;
   accountName: string;
 }
 
-// Complete driver registration data
 export interface DriverRegistrationData {
-  vehicleInfo: VehicleInfo;
-  license: LicenseInfo;
-  documents: VehicleDocuments;
-  bankAccount: BankAccount;
-}
-
-// Image upload state (used in UI)
-export interface ImageUpload {
-  uri: string;
-  uploading: boolean;
-  uploaded: boolean;
-  cloudinaryUrl?: string;
-}
-
-// Driver profile (from database)
-export interface DriverProfile {
-  uid: string;
-  userId: string;
-  status: DriverStatus;
-  isOnline: boolean;
-  
-  // Vehicle Information
   vehicleType: VehicleType;
-  vehicleMake: string;
-  vehicleModel: string;
-  vehicleYear: number;
   vehicleColor: string;
   plateNumber: string;
   vehiclePhotos: string[];
-  
-  // Driver License
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
   licenseNumber: string;
-  licenseExpiry: Date;
+  licenseExpiry: string;
   licenseFrontPhoto: string;
   licenseBackPhoto: string;
-  
-  // Vehicle Registration
-  registrationNumber: string;
-  registrationPhoto: string;
-  insurancePhoto: string;
-  
-  // Bank Information
   bankName: string;
   accountNumber: string;
   accountName: string;
-  
-  // Current Location
-  currentLocation: {
-    latitude: number;
-    longitude: number;
-    heading: number;
-    timestamp: Date;
-  } | null;
-  
-  // Statistics
+  payout_pref: PayoutPreference;
+}
+
+export interface Driver {
+  uid: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  profilePhoto: string | null;
+  status: DriverStatus;
+  isOnline: boolean;
+  payout_pref: PayoutPreference;
+
+  vehicleType: VehicleType;
+  vehicleColor: string;
+  plateNumber: string;
+  vehiclePhotos: string[];
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+
+  licenseNumber: string;
+  licenseExpiry: string;
+  licenseFrontPhoto: string;
+  licenseBackPhoto: string;
+
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+
   totalEarnings: number;
   pendingPayouts: number;
   completedRides: number;
   rating: number;
   totalRatings: number;
-  
-  // Security Fields
-  pinLastChanged: Date;
-  biometricEnabled: boolean;
-  knownDevices: string[];
-  failedLoginAttempts: number;
-  lockedUntil: Date | null;
-  
-  // Timestamps
-  createdAt: Date;
-  updatedAt: Date;
+
+  pinLastChanged?: Timestamp;
+  biometricEnabled?: boolean;
+  knownDevices?: string[];
+  failedLoginAttempts?: number;
+  lockedUntil?: Timestamp | null;
+
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }

@@ -1,19 +1,20 @@
-export type PaymentMethod = 'cash' | 'transfer' | 'card';
+import { Timestamp } from "firebase/firestore";
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed';
+export type PaymentMethod = "cash" | "transfer" | "card";
+export type PaymentStatus = "pending" | "completed" | "failed";
 
-export interface PaymentMetadata {
+export interface Payment {
+  paymentId: string;
   rideId: string;
   driverId: string;
   passengerId: string;
   amount: number;
-  pickup: string;
-  dropoff: string;
-  custom_fields?: {
-    display_name: string;
-    variable_name: string;
-    value: string;
-  }[];
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  reference?: string;
+  paidAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface PaystackInitializeResponse {
@@ -32,7 +33,7 @@ export interface PaystackVerifyResponse {
   data: {
     id: number;
     domain: string;
-    status: 'success' | 'failed';
+    status: "success" | "failed";
     reference: string;
     amount: number;
     message: string | null;
@@ -42,7 +43,19 @@ export interface PaystackVerifyResponse {
     channel: string;
     currency: string;
     ip_address: string;
-    metadata: PaymentMetadata;
+    metadata: {
+      rideId: string;
+      driverId: string;
+      passengerId: string;
+      amount: number;
+      pickup: string;
+      dropoff: string;
+      custom_fields?: {
+        display_name: string;
+        variable_name: string;
+        value: string;
+      }[];
+    };
     fees: number;
     customer: {
       id: number;
@@ -62,16 +75,4 @@ export interface PaystackVerifyResponse {
       brand: string;
     };
   };
-}
-
-export interface PaymentRecord {
-  rideId: string;
-  driverId: string;
-  passengerId: string;
-  amount: number;
-  paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
-  paymentReference?: string;
-  paidAt: Date;
-  payoutStatus?: 'pending' | 'paid';
 }

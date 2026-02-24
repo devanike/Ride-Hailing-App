@@ -1,10 +1,10 @@
-import { POPULAR_LOCATIONS, searchLocations } from '@/data/popularLocations';
-import { useTheme } from '@/hooks/useTheme';
-import { LocationCategory, PopularLocation } from '@/types/locations';
-import { PlaceDetails } from '@/types/places';
-import * as Icons from 'lucide-react-native';
-import { LucideIcon, MapPin, Search } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { POPULAR_LOCATIONS, searchLocations } from "@/data/popularLocations";
+import { useTheme } from "@/hooks/useTheme";
+import { LocationCategory, PopularLocation } from "@/types/locations";
+import { PlaceDetails } from "@/types/places";
+import * as Icons from "lucide-react-native";
+import { LucideIcon, MapPin, Search } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -12,8 +12,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { LocationSearchInput } from './LocationSearchInput';
+} from "react-native";
+import { LocationSearchInput } from "./LocationSearchInput";
 
 interface PopularLocationsProps {
   onLocationSelect: (location: PopularLocation | PlaceDetails) => void;
@@ -27,19 +27,19 @@ interface PopularLocationsProps {
  */
 const getIconComponent = (iconName: string): LucideIcon => {
   const iconMap: Record<string, LucideIcon> = {
-    'door-open': Icons.DoorOpen,
-    'book-open': Icons.BookOpen,
-    'flask-conical': Icons.FlaskConical,
-    'palette': Icons.Palette,
-    'chart-bar': Icons.BarChart3,
-    'home': Icons.Home,
-    'dumbbell': Icons.Dumbbell,
-    'building-2': Icons.Building2,
-    'hospital': Icons.Hospital,
-    'cross': Icons.Cross,
-    'building': Icons.Building,
+    "door-open": Icons.DoorOpen,
+    "book-open": Icons.BookOpen,
+    "flask-conical": Icons.FlaskConical,
+    palette: Icons.Palette,
+    "chart-bar": Icons.BarChart3,
+    home: Icons.Home,
+    dumbbell: Icons.Dumbbell,
+    "building-2": Icons.Building2,
+    hospital: Icons.Hospital,
+    cross: Icons.Cross,
+    building: Icons.Building,
   };
-  
+
   return iconMap[iconName] || Icons.MapPin;
 };
 
@@ -54,15 +54,15 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
   enableGoogleSearch = true, // Default to enabled
 }) => {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [useGoogleSearch, setUseGoogleSearch] = useState(false);
 
   // Filter locations
   const filteredLocations = searchQuery
     ? searchLocations(searchQuery)
     : filterCategory
-    ? POPULAR_LOCATIONS.filter(loc => loc.category === filterCategory)
-    : POPULAR_LOCATIONS;
+      ? POPULAR_LOCATIONS.filter((loc) => loc.category === filterCategory)
+      : POPULAR_LOCATIONS;
 
   const styles = StyleSheet.create({
     container: {
@@ -70,23 +70,23 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
     },
     searchContainer: {
       paddingHorizontal: spacing.screenPadding,
-      paddingVertical: spacing.base,
-      backgroundColor: colors.background.light,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.background,
     },
     searchToggle: {
-      flexDirection: 'row',
+      flexDirection: "row",
       marginBottom: spacing.sm,
       gap: spacing.sm,
     },
     toggleButton: {
       flex: 1,
       paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: colors.surface,
     },
     toggleButtonActive: {
       backgroundColor: colors.primary,
@@ -95,20 +95,20 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
     toggleText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     toggleTextActive: {
-      color: colors.text.inverse,
+      color: colors.textInverse,
     },
     searchInput: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.md,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
       paddingVertical: spacing.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
     },
     searchIcon: {
       marginRight: spacing.sm,
@@ -117,35 +117,35 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
       flex: 1,
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.primary,
+      color: colors.textPrimary,
     },
     listContainer: {
       paddingHorizontal: spacing.screenPadding,
     },
     locationCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface.light,
-      padding: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      padding: spacing.md,
       borderRadius: borderRadius.md,
       marginBottom: spacing.md,
       borderWidth: 1,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
       ...shadows.small,
     },
     locationCardSelected: {
       borderColor: colors.primary,
       borderWidth: 2,
-      backgroundColor: colors.primary + '10',
+      backgroundColor: colors.primary + "10",
     },
     iconContainer: {
       width: 48,
       height: 48,
       borderRadius: borderRadius.md,
-      backgroundColor: colors.background.gray,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.base,
+      backgroundColor: colors.backgroundAlt,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: spacing.md,
     },
     locationInfo: {
       flex: 1,
@@ -153,43 +153,43 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
     locationName: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs / 2,
     },
     locationDescription: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     categoryBadge: {
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs / 2,
       borderRadius: borderRadius.sm,
-      backgroundColor: colors.status.infoLight,
+      backgroundColor: colors.info,
     },
     categoryText: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.status.info,
-      textTransform: 'capitalize',
+      color: colors.info,
+      textTransform: "capitalize",
     },
     emptyContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: spacing['3xl'],
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.xl,
     },
     emptyText: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
-      marginTop: spacing.base,
+      color: colors.textSecondary,
+      marginTop: spacing.md,
     },
     hint: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.tertiary,
+      color: colors.textMuted,
       marginTop: spacing.sm,
-      textAlign: 'center',
+      textAlign: "center",
     },
   });
 
@@ -225,9 +225,11 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <MapPin size={48} color={colors.text.tertiary} />
+      <MapPin size={48} color={colors.textMuted} />
       <Text style={styles.emptyText}>
-        {searchQuery ? 'No locations found in campus list' : 'No locations available'}
+        {searchQuery
+          ? "No locations found in campus list"
+          : "No locations available"}
       </Text>
       {enableGoogleSearch && searchQuery && (
         <Text style={styles.hint}>
@@ -245,18 +247,34 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
         {enableGoogleSearch && (
           <View style={styles.searchToggle}>
             <TouchableOpacity
-              style={[styles.toggleButton, !useGoogleSearch && styles.toggleButtonActive]}
+              style={[
+                styles.toggleButton,
+                !useGoogleSearch && styles.toggleButtonActive,
+              ]}
               onPress={() => setUseGoogleSearch(false)}
             >
-              <Text style={[styles.toggleText, !useGoogleSearch && styles.toggleTextActive]}>
+              <Text
+                style={[
+                  styles.toggleText,
+                  !useGoogleSearch && styles.toggleTextActive,
+                ]}
+              >
                 Campus Locations
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleButton, useGoogleSearch && styles.toggleButtonActive]}
+              style={[
+                styles.toggleButton,
+                useGoogleSearch && styles.toggleButtonActive,
+              ]}
               onPress={() => setUseGoogleSearch(true)}
             >
-              <Text style={[styles.toggleText, useGoogleSearch && styles.toggleTextActive]}>
+              <Text
+                style={[
+                  styles.toggleText,
+                  useGoogleSearch && styles.toggleTextActive,
+                ]}
+              >
                 Google Search
               </Text>
             </TouchableOpacity>
@@ -271,11 +289,15 @@ export const PopularLocations: React.FC<PopularLocationsProps> = ({
           />
         ) : (
           <View style={styles.searchInput}>
-            <Search size={20} color={colors.text.tertiary} style={styles.searchIcon} />
+            <Search
+              size={20}
+              color={colors.textMuted}
+              style={styles.searchIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Search campus locations..."
-              placeholderTextColor={colors.text.tertiary}
+              placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"

@@ -1,11 +1,11 @@
-import { Button } from '@/components/common/Button';
-import { useTheme } from '@/hooks/useTheme';
-import { sendPhoneOTP, verifyOTP } from '@/services/authService';
-import { db } from '@/services/firebaseConfig';
-import { showError, showSuccess } from '@/utils/toast';
-import { router, useLocalSearchParams } from 'expo-router';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { useTheme } from "@/hooks/useTheme";
+import { sendPhoneOTP, verifyOTP } from "@/services/authService";
+import { db } from "@/services/firebaseConfig";
+import { showError, showSuccess } from "@/utils/toast";
+import { router, useLocalSearchParams } from "expo-router";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,22 +15,22 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OTPVerificationScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
   const params = useLocalSearchParams();
-  const { name, phone, userType, isLogin } = params as { 
-    name?: string; 
-    phone: string; 
-    userType?: 'passenger' | 'driver';
+  const { name, phone, userType, isLogin } = params as {
+    name?: string;
+    phone: string;
+    userType?: "passenger" | "driver";
     isLogin?: string;
   };
 
-  const isLoginMode = isLogin === 'true';
+  const isLoginMode = isLogin === "true";
 
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -55,11 +55,11 @@ export default function OTPVerificationScreen() {
         const result = await sendPhoneOTP(phone);
         setConfirmationResult(result);
       } catch (error: any) {
-        showError('Error', 'Failed to send OTP');
-        console.error('OTP send error:', error);
+        showError("Error", "Failed to send OTP");
+        console.error("OTP send error:", error);
       }
     };
-    
+
     sendOTP();
   }, [phone]);
 
@@ -77,22 +77,22 @@ export default function OTPVerificationScreen() {
     }
 
     // Auto-submit when all filled
-    if (newOtp.every((digit) => digit !== '') && index === 5) {
-      handleVerify(newOtp.join(''));
+    if (newOtp.every((digit) => digit !== "") && index === 5) {
+      handleVerify(newOtp.join(""));
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handleVerify = async (code?: string) => {
-    const otpCode = code || otp.join('');
-    
+    const otpCode = code || otp.join("");
+
     if (otpCode.length !== 6) {
-      showError('Invalid OTP', 'Please enter all 6 digits');
+      showError("Invalid OTP", "Please enter all 6 digits");
       return;
     }
 
@@ -105,15 +105,15 @@ export default function OTPVerificationScreen() {
 
       if (isLoginMode) {
         // Login mode - just verify and navigate
-        showSuccess('Success', 'Login successful');
-        
+        showSuccess("Success", "Login successful");
+
         // TODO: Navigate based on user type
-        router.replace('/(auth)/welcome'); // Temporary
+        router.replace("/(auth)/welcome"); // Temporary
         return;
       }
 
       // Signup mode - create user documents
-      await setDoc(doc(db, 'users', uid), {
+      await setDoc(doc(db, "users", uid), {
         uid,
         name,
         phone,
@@ -123,81 +123,81 @@ export default function OTPVerificationScreen() {
         rating: 0,
         totalRides: 0,
         isAdmin: false,
-        
+
         // Security fields - initial values
         pinLastChanged: serverTimestamp(),
         biometricEnabled: false,
         knownDevices: [],
         failedLoginAttempts: 0,
         lockedUntil: null,
-        
+
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       // If driver, create driver document with status 'incomplete'
-      if (userType === 'driver') {
-        await setDoc(doc(db, 'drivers', uid), {
+      if (userType === "driver") {
+        await setDoc(doc(db, "drivers", uid), {
           uid,
           userId: uid,
-          status: 'incomplete',
+          status: "incomplete",
           isOnline: false,
-          
+
           // Vehicle Information - null initially
           vehicleType: null,
-          vehicleMake: '',
-          vehicleModel: '',
+          vehicleMake: "",
+          vehicleModel: "",
           vehicleYear: 0,
-          vehicleColor: '',
-          plateNumber: '',
+          vehicleColor: "",
+          plateNumber: "",
           vehiclePhotos: [],
-          
+
           // Driver License - null initially
-          licenseNumber: '',
+          licenseNumber: "",
           licenseExpiry: null,
-          licenseFrontPhoto: '',
-          licenseBackPhoto: '',
-          
+          licenseFrontPhoto: "",
+          licenseBackPhoto: "",
+
           // Vehicle Registration - null initially
-          registrationNumber: '',
-          registrationPhoto: '',
-          insurancePhoto: '',
-          
+          registrationNumber: "",
+          registrationPhoto: "",
+          insurancePhoto: "",
+
           // Bank Information - null initially
-          bankName: '',
-          accountNumber: '',
-          accountName: '',
-          
+          bankName: "",
+          accountNumber: "",
+          accountName: "",
+
           // Current Location
           currentLocation: null,
-          
+
           // Statistics
           totalEarnings: 0,
           pendingPayouts: 0,
           completedRides: 0,
           rating: 0,
           totalRatings: 0,
-          
+
           // Security fields
           pinLastChanged: serverTimestamp(),
           biometricEnabled: false,
           knownDevices: [],
           failedLoginAttempts: 0,
           lockedUntil: null,
-          
+
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       }
 
-      showSuccess('Success', 'Account created successfully');
+      showSuccess("Success", "Account created successfully");
 
       // Navigate to profile setup
-      router.push('/(auth)/profile-setup');
+      router.push("/(auth)/profile-setup");
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      showError('Verification Failed', 'Invalid OTP code. Please try again.');
-      setOtp(['', '', '', '', '', '']);
+      console.error("OTP verification error:", error);
+      showError("Verification Failed", "Invalid OTP code. Please try again.");
+      setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
@@ -212,10 +212,10 @@ export default function OTPVerificationScreen() {
       setResendTimer(60);
       const result = await sendPhoneOTP(phone);
       setConfirmationResult(result);
-      showSuccess('OTP Sent', 'A new code has been sent to your phone');
+      showSuccess("OTP Sent", "A new code has been sent to your phone");
     } catch (err: any) {
-      console.error('Resend OTP error:', err);
-      showError('Error', 'Failed to resend OTP');
+      console.error("Resend OTP error:", err);
+      showError("Error", "Failed to resend OTP");
       setCanResend(true);
     }
   };
@@ -223,27 +223,27 @@ export default function OTPVerificationScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     content: {
       flex: 1,
       paddingHorizontal: spacing.screenPadding,
-      paddingTop: spacing['2xl'],
+      paddingTop: spacing.xl,
       paddingBottom: spacing.xl,
     },
     header: {
-      marginBottom: spacing['3xl'],
+      marginBottom: spacing.xxl,
     },
     title: {
-      fontSize: typography.sizes['3xl'],
+      fontSize: typography.sizes["3xl"],
       fontFamily: typography.fonts.heading,
-      color: colors.text.primary,
+      color: colors.textPrimary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
     },
     phoneNumber: {
@@ -251,38 +251,38 @@ export default function OTPVerificationScreen() {
       color: colors.primary,
     },
     otpContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: spacing['3xl'],
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: spacing.xxl,
     },
     otpInput: {
       width: 50,
       height: 60,
       borderWidth: 2,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
       borderRadius: borderRadius.md,
-      textAlign: 'center',
-      fontSize: typography.sizes['2xl'],
+      textAlign: "center",
+      fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
-      backgroundColor: colors.surface.light,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
     },
     otpInputFilled: {
       borderColor: colors.primary,
     },
     resendContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       marginBottom: spacing.xl,
     },
     resendText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
       marginBottom: spacing.sm,
     },
     resendButton: {
       paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
     },
     resendButtonText: {
       fontSize: typography.sizes.base,
@@ -293,23 +293,23 @@ export default function OTPVerificationScreen() {
       opacity: 0.5,
     },
     footer: {
-      marginTop: 'auto',
+      marginTop: "auto",
     },
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Enter Verification Code</Text>
             <Text style={styles.subtitle}>
-              We sent a 6-digit code to{' '}
+              We sent a 6-digit code to{" "}
               <Text style={styles.phoneNumber}>{phone}</Text>
             </Text>
           </View>
@@ -322,10 +322,7 @@ export default function OTPVerificationScreen() {
                 ref={(ref) => {
                   inputRefs.current[index] = ref;
                 }}
-                style={[
-                  styles.otpInput,
-                  digit && styles.otpInputFilled,
-                ]}
+                style={[styles.otpInput, digit && styles.otpInputFilled]}
                 value={digit}
                 onChangeText={(value) => handleOtpChange(value, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
@@ -341,7 +338,9 @@ export default function OTPVerificationScreen() {
           {/* Resend */}
           <View style={styles.resendContainer}>
             <Text style={styles.resendText}>
-              {canResend ? "Didn't receive code?" : `Resend code in ${resendTimer}s`}
+              {canResend
+                ? "Didn't receive code?"
+                : `Resend code in ${resendTimer}s`}
             </Text>
             <TouchableOpacity
               style={[

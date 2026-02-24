@@ -1,18 +1,9 @@
-import { createGlobalStyles } from '@/styles/globalStyles';
-import { getTheme } from '@/styles/theme';
-import { useMemo } from 'react';
-// import { useColorScheme } from './use-color-scheme';
+import { createGlobalStyles } from "@/styles/globalStyles";
+import { theme } from "@/styles/theme";
+import { useMemo } from "react";
 
 export const useTheme = () => {
-  // const colorScheme = useColorScheme();
-  // const isDark = colorScheme === 'dark';
-  const isDark = false;
-
-  // Memoize theme to prevent unnecessary recalculations
-  const theme = useMemo(() => getTheme(isDark), [isDark]);
-  
-  // Memoize global styles to prevent unnecessary recalculations
-  const globalStyles = useMemo(() => createGlobalStyles(theme), [theme]);
+  const globalStyles = useMemo(() => createGlobalStyles(theme), []);
 
   return {
     theme,
@@ -22,12 +13,8 @@ export const useTheme = () => {
     borderRadius: theme.borderRadius,
     shadows: theme.shadows,
     layout: theme.layout,
-    isDark,
     globalStyles,
   };
 };
 
-/**
- * Type for the return value of useTheme hook
- */
 export type UseThemeReturn = ReturnType<typeof useTheme>;

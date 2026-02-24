@@ -1,5 +1,5 @@
-import { useTheme } from '@/hooks/useTheme';
-import { LocationCategory } from '@/types/locations';
+import { useTheme } from "@/hooks/useTheme";
+import { LocationCategory } from "@/types/locations";
 import {
   BookOpen,
   Building,
@@ -9,35 +9,35 @@ import {
   Home,
   Hospital,
   LucideIcon,
-} from 'lucide-react-native';
-import React from 'react';
+} from "lucide-react-native";
+import React from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
 interface CategoryFilterProps {
-  selectedCategory: LocationCategory | 'all';
-  onSelectCategory: (category: LocationCategory | 'all') => void;
+  selectedCategory: LocationCategory | "all";
+  onSelectCategory: (category: LocationCategory | "all") => void;
 }
 
 interface CategoryItem {
-  value: LocationCategory | 'all';
+  value: LocationCategory | "all";
   label: string;
   Icon: LucideIcon;
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { value: 'all', label: 'All', Icon: Grid3x3 },
-  { value: LocationCategory.ACADEMIC, label: 'Academic', Icon: BookOpen },
-  { value: LocationCategory.RESIDENTIAL, label: 'Halls', Icon: Home },
-  { value: LocationCategory.FACILITIES, label: 'Facilities', Icon: Building2 },
-  { value: LocationCategory.RECREATION, label: 'Recreation', Icon: Dumbbell },
-  { value: LocationCategory.MEDICAL, label: 'Medical', Icon: Hospital },
-  { value: LocationCategory.ADMINISTRATIVE, label: 'Admin', Icon: Building },
+  { value: "all", label: "All", Icon: Grid3x3 },
+  { value: LocationCategory.ACADEMIC, label: "Academic", Icon: BookOpen },
+  { value: LocationCategory.RESIDENTIAL, label: "Halls", Icon: Home },
+  { value: LocationCategory.FACILITIES, label: "Facilities", Icon: Building2 },
+  { value: LocationCategory.RECREATION, label: "Recreation", Icon: Dumbbell },
+  { value: LocationCategory.MEDICAL, label: "Medical", Icon: Hospital },
+  { value: LocationCategory.ADMINISTRATIVE, label: "Admin", Icon: Building },
 ];
 
 /**
@@ -52,22 +52,22 @@ export const LocationCategoryFilter: React.FC<CategoryFilterProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: colors.background.light,
-      paddingVertical: spacing.base,
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
     },
     scrollContent: {
       paddingHorizontal: spacing.screenPadding,
       gap: spacing.sm,
     },
     categoryChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.base,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.surface.light,
+      backgroundColor: colors.surface,
       borderWidth: 1,
-      borderColor: colors.border.light,
+      borderColor: colors.border,
       marginRight: spacing.sm,
     },
     categoryChipSelected: {
@@ -80,10 +80,10 @@ export const LocationCategoryFilter: React.FC<CategoryFilterProps> = ({
     categoryText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     categoryTextSelected: {
-      color: colors.text.inverse,
+      color: colors.textInverse,
     },
   });
 
@@ -109,9 +109,9 @@ export const LocationCategoryFilter: React.FC<CategoryFilterProps> = ({
               activeOpacity={0.7}
             >
               <View style={styles.iconContainer}>
-                <Icon 
-                  size={16} 
-                  color={isSelected ? colors.text.inverse : colors.text.secondary} 
+                <Icon
+                  size={16}
+                  color={isSelected ? colors.textInverse : colors.textSecondary}
                 />
               </View>
               <Text

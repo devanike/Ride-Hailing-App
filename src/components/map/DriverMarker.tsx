@@ -1,9 +1,9 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Coordinates } from '@/types/map';
-import { Car } from 'lucide-react-native';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Marker } from 'react-native-maps';
+import { useTheme } from "@/hooks/useTheme";
+import { Coordinates } from "@/types/map";
+import { Car } from "lucide-react-native";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { Marker } from "react-native-maps";
 
 /**
  * Driver Marker Component
@@ -28,18 +28,18 @@ export const DriverMarker: React.FC<DriverMarkerProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
     },
     iconContainer: {
       width: 40,
       height: 40,
       borderRadius: borderRadius.full,
-      backgroundColor: isOnline ? colors.primary : colors.text.tertiary,
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: isOnline ? colors.primary : colors.textMuted,
+      alignItems: "center",
+      justifyContent: "center",
       borderWidth: 3,
-      borderColor: colors.surface.light,
+      borderColor: colors.surface,
       ...shadows.medium,
     },
   });
@@ -53,7 +53,7 @@ export const DriverMarker: React.FC<DriverMarkerProps> = ({
     >
       <View style={styles.container}>
         <View style={styles.iconContainer}>
-          <Car size={20} color={colors.text.inverse} />
+          <Car size={20} color={colors.textInverse} />
         </View>
       </View>
     </Marker>

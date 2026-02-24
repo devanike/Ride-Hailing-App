@@ -1,9 +1,9 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Coordinates } from '@/types/map';
-import { User } from 'lucide-react-native';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Marker } from 'react-native-maps';
+import { useTheme } from "@/hooks/useTheme";
+import { Coordinates } from "@/types/map";
+import { User } from "lucide-react-native";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { Marker } from "react-native-maps";
 
 /**
  * User Location Marker
@@ -24,18 +24,18 @@ export const UserMarker: React.FC<UserMarkerProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
     },
     iconContainer: {
       width: 32,
       height: 32,
       borderRadius: borderRadius.full,
       backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
       borderWidth: 3,
-      borderColor: colors.surface.light,
+      borderColor: colors.surface,
       ...shadows.medium,
     },
   });
@@ -44,7 +44,7 @@ export const UserMarker: React.FC<UserMarkerProps> = ({
     <Marker coordinate={coordinate} onPress={onPress}>
       <View style={styles.container}>
         <View style={styles.iconContainer}>
-          <User size={16} color={colors.text.inverse} />
+          <User size={16} color={colors.textInverse} />
         </View>
       </View>
     </Marker>

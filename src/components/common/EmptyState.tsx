@@ -1,5 +1,5 @@
-import { useTheme } from '@/hooks/useTheme';
-import React from 'react';
+import { useTheme } from "@/hooks/useTheme";
+import React from "react";
 import {
   StyleSheet,
   Text,
@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-} from 'react-native';
+} from "react-native";
 
 export interface ActionButton {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline';
+  variant?: "primary" | "outline";
 }
 
 export interface EmptyStateProps {
@@ -30,71 +30,71 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   const { colors, spacing, borderRadius, typography, shadows } = useTheme();
 
-  const isStringIcon = typeof icon === 'string';
+  const isStringIcon = typeof icon === "string";
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       padding: spacing.xl,
     } as ViewStyle,
-    
+
     iconContainer: {
       marginBottom: spacing.xl,
     } as ViewStyle,
-    
+
     emoji: {
       fontSize: 64,
-      textAlign: 'center',
+      textAlign: "center",
     } as TextStyle,
-    
+
     title: {
-      fontSize: typography.sizes['2xl'],
+      fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
-      textAlign: 'center',
+      color: colors.textPrimary,
+      textAlign: "center",
       marginBottom: spacing.sm,
     } as TextStyle,
-    
+
     message: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
-      textAlign: 'center',
+      color: colors.textSecondary,
+      textAlign: "center",
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
       marginBottom: spacing.xl,
       maxWidth: 300,
     } as TextStyle,
-    
+
     button: {
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
       borderRadius: borderRadius.md,
       minWidth: 150,
-      alignItems: 'center',
+      alignItems: "center",
     } as ViewStyle,
-    
+
     buttonPrimary: {
       backgroundColor: colors.primary,
       ...shadows.medium,
     } as ViewStyle,
-    
+
     buttonOutline: {
-      backgroundColor: 'transparent',
+      backgroundColor: "transparent",
       borderWidth: 1,
       borderColor: colors.primary,
     } as ViewStyle,
-    
+
     buttonText: {
       fontSize: typography.sizes.base,
-      fontWeight: '600',
+      fontWeight: "600",
     } as TextStyle,
-    
+
     buttonTextPrimary: {
-      color: colors.text.inverse,
+      color: colors.textInverse,
     } as TextStyle,
-    
+
     buttonTextOutline: {
       color: colors.primary,
     } as TextStyle,
@@ -103,21 +103,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        {isStringIcon ? (
-          <Text style={styles.emoji}>{icon}</Text>
-        ) : (
-          icon
-        )}
+        {isStringIcon ? <Text style={styles.emoji}>{icon}</Text> : icon}
       </View>
-      
+
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
-      
+
       {actionButton && (
         <TouchableOpacity
           style={[
             styles.button,
-            actionButton.variant === 'outline'
+            actionButton.variant === "outline"
               ? styles.buttonOutline
               : styles.buttonPrimary,
           ]}
@@ -127,7 +123,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           <Text
             style={[
               styles.buttonText,
-              actionButton.variant === 'outline'
+              actionButton.variant === "outline"
                 ? styles.buttonTextOutline
                 : styles.buttonTextPrimary,
             ]}

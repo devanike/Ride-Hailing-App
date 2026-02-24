@@ -1,7 +1,7 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Upload } from 'lucide-react-native';
-import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from "@/hooks/useTheme";
+import { Upload } from "lucide-react-native";
+import React from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface ImageUpload {
   uri: string;
@@ -27,18 +27,18 @@ export const DocumentUploadButton: React.FC<DocumentUploadButtonProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
     },
     button: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       paddingVertical: spacing.md,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
       borderRadius: borderRadius.md,
       borderWidth: 2,
-      borderColor: colors.border.light,
-      borderStyle: 'dashed',
-      backgroundColor: colors.background.gray,
+      borderColor: colors.border,
+      borderStyle: "dashed",
+      backgroundColor: colors.backgroundAlt,
     },
     preview: {
       width: 60,
@@ -49,11 +49,11 @@ export const DocumentUploadButton: React.FC<DocumentUploadButtonProps> = ({
       marginLeft: spacing.sm,
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     error: {
       fontSize: typography.sizes.sm,
-      color: colors.status.error,
+      color: colors.error,
       marginTop: spacing.xs,
       marginLeft: spacing.xs,
     },
@@ -65,10 +65,10 @@ export const DocumentUploadButton: React.FC<DocumentUploadButtonProps> = ({
         {document ? (
           <Image source={{ uri: document.uri }} style={styles.preview} />
         ) : (
-          <Upload size={20} color={colors.text.tertiary} />
+          <Upload size={20} color={colors.textMuted} />
         )}
         <Text style={styles.text}>
-          {document ? 'Change' : 'Upload'} {label}
+          {document ? "Change" : "Upload"} {label}
         </Text>
       </TouchableOpacity>
       {error && <Text style={styles.error}>{error}</Text>}

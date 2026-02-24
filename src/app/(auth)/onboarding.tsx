@@ -1,9 +1,9 @@
-import { Button } from '@/components/common/Button';
-import { useTheme } from '@/hooks/useTheme';
-import { showError } from '@/utils/toast';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import { Button } from "@/components/common/Button";
+import { useTheme } from "@/hooks/useTheme";
+import { showError } from "@/utils/toast";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -15,10 +15,10 @@ import {
   TouchableOpacity,
   View,
   ViewToken,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 interface OnboardingSlide {
   id: string;
@@ -32,21 +32,22 @@ interface ViewableItemsChanged {
   changed: ViewToken[];
 }
 
-const ONBOARDING_KEY = '@onboarding_completed' as const;
+const ONBOARDING_KEY = "@onboarding_completed" as const;
 
 const slides: readonly OnboardingSlide[] = [
   {
-    id: '1',
-    title: 'Find Your Ride',
-    description: 'Connect with verified drivers across UI campus in seconds',
-    image: require('@/assets/illustrations/onboarding-1.svg'),
+    id: "1",
+    title: "Find Your Ride",
+    description: "Connect with verified drivers across UI campus in seconds",
+    image: require("@/assets/illustrations/onboarding-1.svg"),
   },
   {
-    id: '2',
-    title: 'Track in Real-Time',
-    description: 'Know exactly where your driver is and get accurate arrival times',
-    image: require('@/assets/illustrations/onboarding-2.svg'),
-  }
+    id: "2",
+    title: "Track in Real-Time",
+    description:
+      "Know exactly where your driver is and get accurate arrival times",
+    image: require("@/assets/illustrations/onboarding-2.svg"),
+  },
   // {
   //   id: '3',
   //   title: 'Safe & Secure',
@@ -66,7 +67,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         setCurrentIndex(viewableItems[0].index);
       }
-    }
+    },
   ).current;
 
   const viewabilityConfig = useRef({
@@ -76,18 +77,17 @@ export default function OnboardingScreen(): React.JSX.Element {
   const handleGetStarted = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      
+      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+
       // Add small delay for better UX
       setTimeout(() => {
-        router.replace('/(auth)/welcome');
+        router.replace("/(auth)/welcome");
       }, 200);
     } catch (error) {
-      console.error('Error saving onboarding status:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to complete setup';
-      showError('Error', errorMessage);
+      console.error("Error saving onboarding status:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to complete setup";
+      showError("Error", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -107,86 +107,88 @@ export default function OnboardingScreen(): React.JSX.Element {
   const handleSkip = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      
+      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+
       // Add small delay for better UX
       setTimeout(() => {
-        router.replace('/(auth)/welcome');
+        router.replace("/(auth)/welcome");
       }, 200);
     } catch (error) {
-      console.error('Error saving onboarding status:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to save progress';
-      showError('Error', errorMessage);
+      console.error("Error saving onboarding status:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save progress";
+      showError("Error", errorMessage);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const renderSlide = useCallback(({ item }: { item: OnboardingSlide }): React.JSX.Element => {
-    const styles = StyleSheet.create({
-      slide: {
-        width,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: spacing.screenPadding,
-        paddingTop: spacing['3xl'],
-      },
-      illustration: {
-        width: Math.min(width * 0.75, 280),
-        height: Math.min(width * 0.75, 280),
-        resizeMode: 'contain',
-        marginBottom: spacing['2xl'],
-      },
-      title: {
-        fontSize: typography.sizes['3xl'],
-        fontFamily: typography.fonts.heading,
-        color: colors.text.primary,
-        textAlign: 'center',
-        marginBottom: spacing.md,
-      },
-      description: {
-        fontSize: typography.sizes.base,
-        fontFamily: typography.fonts.bodyRegular,
-        color: colors.text.secondary,
-        textAlign: 'center',
-        lineHeight: typography.sizes.base * typography.lineHeights.normal,
-        paddingHorizontal: spacing.lg,
-      },
-    });
+  const renderSlide = useCallback(
+    ({ item }: { item: OnboardingSlide }): React.JSX.Element => {
+      const styles = StyleSheet.create({
+        slide: {
+          width,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: spacing.screenPadding,
+          paddingTop: spacing.xxl,
+        },
+        illustration: {
+          width: Math.min(width * 0.75, 280),
+          height: Math.min(width * 0.75, 280),
+          resizeMode: "contain",
+          marginBottom: spacing.xl,
+        },
+        title: {
+          fontSize: typography.sizes["3xl"],
+          fontFamily: typography.fonts.heading,
+          color: colors.textPrimary,
+          textAlign: "center",
+          marginBottom: spacing.md,
+        },
+        description: {
+          fontSize: typography.sizes.base,
+          fontFamily: typography.fonts.bodyRegular,
+          color: colors.textSecondary,
+          textAlign: "center",
+          lineHeight: typography.sizes.base * typography.lineHeights.normal,
+          paddingHorizontal: spacing.lg,
+        },
+      });
 
-    return (
-      <View style={styles.slide}>
-        <Image source={item.image} style={styles.illustration} />
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
-      </View>
-    );
-  }, [colors, typography, spacing]);
+      return (
+        <View style={styles.slide}>
+          <Image source={item.image} style={styles.illustration} />
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.description}>{item.description}</Text>
+        </View>
+      );
+    },
+    [colors, typography, spacing],
+  );
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.light,
+      backgroundColor: colors.background,
     },
     skipButton: {
-      position: 'absolute',
+      position: "absolute",
       top: spacing.xl,
       right: spacing.screenPadding,
       zIndex: 10,
       paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.base,
+      paddingHorizontal: spacing.md,
     },
     skipText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.secondary,
+      color: colors.textSecondary,
     },
     dotsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: spacing.xl,
       gap: spacing.sm,
     },
@@ -194,7 +196,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       width: 8,
       height: 8,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.border.light,
+      backgroundColor: colors.border,
     },
     dotActive: {
       width: 24,
@@ -209,12 +211,12 @@ export default function OnboardingScreen(): React.JSX.Element {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" />
 
       {/* Skip Button */}
-      <TouchableOpacity 
-        style={styles.skipButton} 
+      <TouchableOpacity
+        style={styles.skipButton}
         onPress={handleSkip}
         disabled={loading}
       >
@@ -249,7 +251,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       {/* Next/Get Started Button */}
       <View style={styles.buttonContainer}>
         <Button
-          title={currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
+          title={currentIndex === slides.length - 1 ? "Get Started" : "Next"}
           onPress={handleNext}
           variant="primary"
           size="large"

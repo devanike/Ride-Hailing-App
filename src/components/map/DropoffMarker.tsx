@@ -1,9 +1,9 @@
-import { useTheme } from '@/hooks/useTheme';
-import { Coordinates } from '@/types/map';
-import { MapPin } from 'lucide-react-native';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Marker } from 'react-native-maps';
+import { useTheme } from "@/hooks/useTheme";
+import { Coordinates } from "@/types/map";
+import { MapPin } from "lucide-react-native";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { Marker } from "react-native-maps";
 
 /**
  * Dropoff Location Marker
@@ -24,21 +24,21 @@ export const DropoffMarker: React.FC<DropoffMarkerProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      alignItems: 'center',
+      alignItems: "center",
     },
     iconContainer: {
       width: 36,
       height: 36,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.status.error,
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: colors.error,
+      alignItems: "center",
+      justifyContent: "center",
       borderWidth: 3,
-      borderColor: colors.surface.light,
+      borderColor: colors.surface,
       ...shadows.medium,
     },
     labelContainer: {
-      backgroundColor: colors.surface.light,
+      backgroundColor: colors.surface,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       borderRadius: borderRadius.sm,
@@ -48,7 +48,7 @@ export const DropoffMarker: React.FC<DropoffMarkerProps> = ({
     label: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.text.primary,
+      color: colors.textPrimary,
     },
   });
 
@@ -56,7 +56,7 @@ export const DropoffMarker: React.FC<DropoffMarkerProps> = ({
     <Marker coordinate={coordinate} onPress={onPress}>
       <View style={styles.container}>
         <View style={styles.iconContainer}>
-          <MapPin size={18} color={colors.text.inverse} />
+          <MapPin size={18} color={colors.textInverse} />
         </View>
         {address && (
           <View style={styles.labelContainer}>
