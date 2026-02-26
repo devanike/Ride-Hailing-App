@@ -2,6 +2,7 @@ import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { PINPad } from "@/components/common/PinPad";
 import { useTheme } from "@/hooks/useTheme";
+import { auth, db } from "@/services/firebaseConfig";
 import {
   authenticateWithBiometric,
   getBiometricCapability,
@@ -15,7 +16,8 @@ import {
 } from "@/services/securityService";
 import { showError, showSuccess } from "@/utils/toast";
 import { router } from "expo-router";
-import { Phone } from "lucide-react-native";
+import { doc, getDoc } from "firebase/firestore";
+import { Lock, Phone } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -29,16 +31,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+
 export default function LoginScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
 
-  // States
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // PIN/Biometric states
   const [hasPinStored, setHasPinStored] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [pinError, setPinError] = useState(false);
@@ -50,7 +51,7 @@ export default function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update lockout timer
+  // Countdown lockout timer
   useEffect(() => {
     if (isLocked && lockoutTime > 0) {
       const timer = setTimeout(async () => {
@@ -68,36 +69,22 @@ export default function LoginScreen() {
     try {
       setCheckingAuth(true);
 
-      // Check if user is already logged in
-      // if (auth.currentUser) {
-      //   // User is logged in, navigate to home
-      //   // TODO: Check user type and navigate appropriately
-      //   router.replace('/(auth)/welcome'); // Temporary
-      //   return;
-      // }
-
-      // Check if user has PIN set up
       const pinExists = await hasPIN();
       setHasPinStored(pinExists);
 
       if (pinExists) {
-        // Check if account is locked
-        const locked = await isAccountLocked();
-        if (locked) {
-          const remaining = await getRemainingLockoutTime();
+        const lockStatus = await isAccountLocked();
+        if (lockStatus.isLocked) {
           setIsLocked(true);
-          setLockoutTime(remaining);
+          setLockoutTime(lockStatus.remainingTime);
         }
 
-        // Check biometric availability
         const biometric = await getBiometricCapability();
-
         if (biometric.available) {
           const enabled = await isBiometricEnabled();
           setBiometricEnabled(enabled);
 
-          // Auto-trigger biometric if enabled
-          if (enabled) {
+          if (enabled && !lockStatus.isLocked) {
             handleBiometricAuth();
           }
         }
@@ -109,16 +96,41 @@ export default function LoginScreen() {
     }
   };
 
+  const routeUser = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      router.replace("/(auth)/welcome");
+      return;
+    }
+
+    const [adminSnap, driverSnap, passengerSnap] = await Promise.all([
+      getDoc(doc(db, "admins", uid)),
+      getDoc(doc(db, "drivers", uid)),
+      getDoc(doc(db, "passengers", uid)),
+    ]);
+
+    if (adminSnap.exists()) {
+      router.replace("/(admin)");
+    } else if (driverSnap.exists()) {
+      router.replace("/(driver)");
+    } else if (passengerSnap.exists()) {
+      router.replace("/(passenger)");
+    } else {
+      router.replace("/(auth)/profile-setup");
+    }
+  };
+
   const handleBiometricAuth = async () => {
     try {
-      const success = await authenticateWithBiometric();
-      if (success) {
+      const result = await authenticateWithBiometric();
+      if (result.success) {
         await resetFailedAttempts();
-        handleLoginSuccess();
+        showSuccess("Welcome Back", "Authenticated successfully");
+        await routeUser();
       }
     } catch (error: any) {
       console.error("Biometric auth error:", error);
-      // User can still use PIN
+      // Fall through to PIN
     }
   };
 
@@ -137,20 +149,19 @@ export default function LoginScreen() {
 
       if (isValid) {
         await resetFailedAttempts();
-        handleLoginSuccess();
+        showSuccess("Welcome Back", "Login successful");
+        await routeUser();
       } else {
         setPinError(true);
         await trackFailedAttempt();
 
-        // Check if locked after failed attempt
-        const locked = await isAccountLocked();
-        if (locked) {
-          const remaining = await getRemainingLockoutTime();
+        const lockStatus = await isAccountLocked();
+        if (lockStatus.isLocked) {
           setIsLocked(true);
-          setLockoutTime(remaining);
+          setLockoutTime(lockStatus.remainingTime);
           showError(
             "Account Locked",
-            `Too many failed attempts. Try again in ${Math.ceil(remaining / 60)} minutes`,
+            `Too many failed attempts. Try again in ${Math.ceil(lockStatus.remainingTime / 60)} minutes`,
           );
         } else {
           showError("Invalid PIN", "Please try again");
@@ -166,16 +177,6 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLoginSuccess = () => {
-    showSuccess("Welcome Back", "Login successful");
-
-    // TODO: Navigate based on user type from Firestore
-    // Passenger → /(passenger)
-    // Driver → /(driver)
-    // Admin → /(admin)
-    router.replace("/(auth)/welcome"); // Temporary
   };
 
   const handlePhoneLogin = async () => {
@@ -196,7 +197,6 @@ export default function LoginScreen() {
       setLoading(true);
       const formattedPhone = `+234${phone}`;
 
-      // Navigate to OTP verification for phone login
       router.push({
         pathname: "/(auth)/otp-verification",
         params: {
@@ -250,9 +250,12 @@ export default function LoginScreen() {
     lockoutContainer: {
       alignItems: "center",
       padding: spacing.xl,
-      backgroundColor: colors.error,
+      backgroundColor: colors.errorBackground,
       borderRadius: borderRadius.lg,
       marginBottom: spacing.xl,
+    },
+    lockoutIcon: {
+      marginBottom: spacing.md,
     },
     lockoutText: {
       fontSize: typography.sizes.base,
@@ -341,7 +344,6 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
@@ -353,11 +355,14 @@ export default function LoginScreen() {
 
           {hasPinStored ? (
             <>
-              {/* Lockout Warning */}
+              {/* Lockout view */}
               {isLocked && (
                 <View style={styles.lockoutContainer}>
+                  <View style={styles.lockoutIcon}>
+                    <Lock size={32} color={colors.error} />
+                  </View>
                   <Text style={styles.lockoutText}>
-                    Account locked due to too many failed attempts
+                    Too many failed attempts. Try again in:
                   </Text>
                   <Text style={styles.lockoutTimer}>
                     {formatLockoutTime(lockoutTime)}
@@ -365,23 +370,24 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              {/* PIN Pad */}
-              <View style={styles.pinContainer}>
-                <PINPad
-                  length={6}
-                  onComplete={handlePINComplete}
-                  onBiometric={
-                    biometricEnabled ? handleBiometricAuth : undefined
-                  }
-                  error={pinError}
-                  loading={loading}
-                  showBiometric={biometricEnabled && !isLocked}
-                  title=""
-                  disabled={loading || isLocked}
-                />
-              </View>
+              {/* PIN Pad (hidden during lockout) */}
+              {!isLocked && (
+                <View style={styles.pinContainer}>
+                  <PINPad
+                    length={6}
+                    onComplete={handlePINComplete}
+                    onBiometric={
+                      biometricEnabled ? handleBiometricAuth : undefined
+                    }
+                    error={pinError}
+                    loading={loading}
+                    showBiometric={biometricEnabled}
+                    title=""
+                    disabled={loading}
+                  />
+                </View>
+              )}
 
-              {/* Forgot PIN */}
               <TouchableOpacity
                 style={styles.forgotPinButton}
                 onPress={() => router.push("/(auth)/forgot-pin")}
@@ -389,14 +395,12 @@ export default function LoginScreen() {
                 <Text style={styles.forgotPinText}>Forgot PIN?</Text>
               </TouchableOpacity>
 
-              {/* Divider */}
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>OR</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              {/* Phone Login Option */}
               <View style={styles.phoneLoginSection}>
                 <Input
                   label="Login with Phone Number"
@@ -426,7 +430,6 @@ export default function LoginScreen() {
             </>
           ) : (
             <>
-              {/* Phone Login */}
               <Input
                 label="Phone Number"
                 value={phone}
@@ -456,7 +459,6 @@ export default function LoginScreen() {
             </>
           )}
 
-          {/* Signup Prompt */}
           <View style={styles.signupPrompt}>
             <Text style={styles.signupPromptText}>
               Don&apos;t have an account?

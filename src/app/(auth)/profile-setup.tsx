@@ -5,8 +5,8 @@ import { auth, db } from "@/services/firebaseConfig";
 import { uploadImage } from "@/services/uploadService";
 import { showError, showSuccess } from "@/utils/toast";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore";
+import { router, useLocalSearchParams } from "expo-router";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Camera, Mail, User } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -25,17 +25,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileSetupScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
+  const params = useLocalSearchParams();
+  const userType = (params.userType as string) ?? "passenger";
+
   const [email, setEmail] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
 
-  const validateEmail = (email: string): boolean => {
-    if (!email.trim()) return true; // Email is optional
+  const validateEmail = (value: string): boolean => {
+    if (!value.trim()) return true; // Optional
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(value)) {
       setEmailError("Invalid email address");
       return false;
     }
@@ -46,7 +49,6 @@ export default function ProfileSetupScreen() {
 
   const pickImage = async () => {
     try {
-      // Request permission
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -58,7 +60,6 @@ export default function ProfileSetupScreen() {
         return;
       }
 
-      // Pick image
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -68,8 +69,6 @@ export default function ProfileSetupScreen() {
 
       if (!result.canceled && result.assets[0]) {
         setUploading(true);
-
-        // Upload to Cloudinary
         const imageUrl = await uploadImage(
           result.assets[0].uri,
           "profile_photos",
@@ -97,17 +96,21 @@ export default function ProfileSetupScreen() {
         return;
       }
 
-      // Update user document
-      await updateDoc(doc(db, "users", uid), {
+      // Update the correct collection document
+      const collection = userType === "driver" ? "drivers" : "passengers";
+      await updateDoc(doc(db, collection, uid), {
         email: email.trim() || null,
         profilePhoto: profilePhoto || null,
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(),
       });
 
       showSuccess("Success", "Profile updated successfully");
 
-      // Navigate to PIN setup
-      router.push("/(auth)/pin-setup");
+      if (userType === "driver") {
+        router.push("/(auth)/driver-registration");
+      } else {
+        router.push("/(auth)/pin-setup");
+      }
     } catch (error: any) {
       console.error("Profile update error:", error);
       showError("Update Failed", error.message || "Failed to update profile");
@@ -117,8 +120,11 @@ export default function ProfileSetupScreen() {
   };
 
   const handleSkip = () => {
-    // Skip to PIN setup without updating profile
-    router.push("/(auth)/pin-setup");
+    if (userType === "driver") {
+      router.push("/(auth)/driver-registration");
+    } else {
+      router.push("/(auth)/pin-setup");
+    }
   };
 
   const styles = StyleSheet.create({
@@ -215,15 +221,14 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Complete Your Profile</Text>
+            <Text style={styles.title}>Set Up Profile</Text>
             <Text style={styles.subtitle}>
               Add a photo and email to personalize your account
             </Text>
           </View>
 
-          {/* Photo Section */}
+          {/* Photo */}
           <View style={styles.photoSection}>
             <TouchableOpacity
               style={styles.photoContainer}
@@ -270,7 +275,6 @@ export default function ProfileSetupScreen() {
             />
           </View>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <Button
               title="Continue"

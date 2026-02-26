@@ -2,9 +2,10 @@ import { Button } from "@/components/common/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { sendPhoneOTP, verifyOTP } from "@/services/authService";
 import { db } from "@/services/firebaseConfig";
+import { markDeviceAsKnown } from "@/services/securityService";
 import { showError, showSuccess } from "@/utils/toast";
 import { router, useLocalSearchParams } from "expo-router";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -38,7 +39,7 @@ export default function OTPVerificationScreen() {
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
-  // Timer for resend
+  // Countdown timer
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -48,7 +49,7 @@ export default function OTPVerificationScreen() {
     }
   }, [resendTimer]);
 
-  // Send initial OTP
+  // Send OTP on mount
   useEffect(() => {
     const sendOTP = async () => {
       try {
@@ -64,19 +65,16 @@ export default function OTPVerificationScreen() {
   }, [phone]);
 
   const handleOtpChange = (value: string, index: number) => {
-    // Only allow digits
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all filled
     if (newOtp.every((digit) => digit !== "") && index === 5) {
       handleVerify(newOtp.join(""));
     }
@@ -85,6 +83,25 @@ export default function OTPVerificationScreen() {
   const handleKeyPress = (e: any, index: number) => {
     if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Route user to the correct home after successful auth
+  const routeAuthenticatedUser = async (uid: string) => {
+    const [adminSnap, driverSnap, passengerSnap] = await Promise.all([
+      getDoc(doc(db, "admins", uid)),
+      getDoc(doc(db, "drivers", uid)),
+      getDoc(doc(db, "passengers", uid)),
+    ]);
+
+    if (adminSnap.exists()) {
+      router.replace("/(admin)");
+    } else if (driverSnap.exists()) {
+      router.replace("/(driver)");
+    } else if (passengerSnap.exists()) {
+      router.replace("/(passenger)");
+    } else {
+      router.replace("/(auth)/profile-setup");
     }
   };
 
@@ -99,101 +116,72 @@ export default function OTPVerificationScreen() {
     try {
       setLoading(true);
 
-      // Verify OTP
       const userCredential = await verifyOTP(confirmationResult, otpCode);
       const uid = userCredential.user.uid;
 
-      if (isLoginMode) {
-        // Login mode - just verify and navigate
-        showSuccess("Success", "Login successful");
+      await markDeviceAsKnown();
 
-        // TODO: Navigate based on user type
-        router.replace("/(auth)/welcome"); // Temporary
+      if (isLoginMode) {
+        // Login: check Firestore to route correctly
+        showSuccess("Success", "Login successful");
+        await routeAuthenticatedUser(uid);
         return;
       }
 
-      // Signup mode - create user documents
-      await setDoc(doc(db, "users", uid), {
-        uid,
-        name,
-        phone,
-        email: null,
-        userType,
-        profilePhoto: null,
-        rating: 0,
-        totalRides: 0,
-        isAdmin: false,
-
-        // Security fields - initial values
-        pinLastChanged: serverTimestamp(),
-        biometricEnabled: false,
-        knownDevices: [],
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // If driver, create driver document with status 'incomplete'
+      // Signup: create initial document in correct collection
       if (userType === "driver") {
         await setDoc(doc(db, "drivers", uid), {
           uid,
-          userId: uid,
-          status: "incomplete",
+          name: name ?? "",
+          phone,
+          email: null,
+          profilePhoto: null,
+          status: "active",
           isOnline: false,
-
-          // Vehicle Information - null initially
           vehicleType: null,
-          vehicleMake: "",
-          vehicleModel: "",
-          vehicleYear: 0,
           vehicleColor: "",
           plateNumber: "",
           vehiclePhotos: [],
-
-          // Driver License - null initially
+          vehicleMake: null,
+          vehicleModel: null,
+          vehicleYear: null,
           licenseNumber: "",
           licenseExpiry: null,
           licenseFrontPhoto: "",
           licenseBackPhoto: "",
-
-          // Vehicle Registration - null initially
-          registrationNumber: "",
-          registrationPhoto: "",
-          insurancePhoto: "",
-
-          // Bank Information - null initially
           bankName: "",
           accountNumber: "",
           accountName: "",
-
-          // Current Location
-          currentLocation: null,
-
-          // Statistics
+          payout_pref: "daily",
           totalEarnings: 0,
           pendingPayouts: 0,
           completedRides: 0,
           rating: 0,
           totalRatings: 0,
-
-          // Security fields
-          pinLastChanged: serverTimestamp(),
-          biometricEnabled: false,
-          knownDevices: [],
-          failedLoginAttempts: 0,
-          lockedUntil: null,
-
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(doc(db, "passengers", uid), {
+          uid,
+          name: name ?? "",
+          phone,
+          email: null,
+          profilePhoto: null,
+          totalRides: 0,
+          rating: 0,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
       }
 
-      showSuccess("Success", "Account created successfully");
+      showSuccess("Success", "Account verified successfully");
 
-      // Navigate to profile setup
-      router.push("/(auth)/profile-setup");
+      // Always go to profile-setup next
+      router.push({
+        pathname: "/(auth)/profile-setup",
+        params: { userType: userType ?? "passenger" },
+      });
     } catch (error: any) {
       console.error("OTP verification error:", error);
       showError("Verification Failed", "Invalid OTP code. Please try again.");
@@ -305,7 +293,6 @@ export default function OTPVerificationScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.content}>
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Enter Verification Code</Text>
             <Text style={styles.subtitle}>
@@ -354,7 +341,6 @@ export default function OTPVerificationScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <Button
               title="Verify"

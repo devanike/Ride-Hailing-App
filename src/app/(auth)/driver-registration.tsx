@@ -3,7 +3,6 @@ import { Input } from "@/components/common/Input";
 import { DocumentUploadButton } from "@/components/driver/DocumentUploadButton";
 import { PhotoUploadGrid } from "@/components/driver/PhotoUploadGrid";
 import { SectionHeader } from "@/components/driver/SectionHeader";
-import { VehicleTypeSelector } from "@/components/driver/VehicleTypeSelector";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { uploadImage, uploadMultipleImages } from "@/services/uploadService";
@@ -20,11 +19,13 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type VehicleType = "sedan" | "suv" | "tricycle" | "minibus";
+type VehicleType = "car" | "tricycle" | "bus";
+type PayoutPreference = "daily" | "weekly";
 
 interface ImageUpload {
   uri: string;
@@ -34,10 +35,10 @@ interface ImageUpload {
 }
 
 export default function DriverRegistrationScreen() {
-  const { colors, typography, spacing } = useTheme();
+  const { colors, typography, spacing, borderRadius } = useTheme();
 
   // Vehicle Information
-  const [vehicleType, setVehicleType] = useState<VehicleType>("sedan");
+  const [vehicleType, setVehicleType] = useState<VehicleType>("car");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleYear, setVehicleYear] = useState("");
@@ -51,30 +52,17 @@ export default function DriverRegistrationScreen() {
   const [licenseFront, setLicenseFront] = useState<ImageUpload | null>(null);
   const [licenseBack, setLicenseBack] = useState<ImageUpload | null>(null);
 
-  // Vehicle Documents
-  const [registrationNumber, setRegistrationNumber] = useState("");
-  const [registrationPhoto, setRegistrationPhoto] =
-    useState<ImageUpload | null>(null);
-  const [insurancePhoto, setInsurancePhoto] = useState<ImageUpload | null>(
-    null,
-  );
-
   // Bank Account
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [payoutPref, setPayoutPref] = useState<PayoutPreference>("daily");
 
-  // State
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const pickImage = async (
-    type:
-      | "vehicle"
-      | "license-front"
-      | "license-back"
-      | "registration"
-      | "insurance",
+    type: "vehicle" | "license-front" | "license-back",
   ) => {
     try {
       const { status } =
@@ -104,10 +92,10 @@ export default function DriverRegistrationScreen() {
 
         switch (type) {
           case "vehicle":
-            if (vehiclePhotos.length < 4) {
+            if (vehiclePhotos.length < 3) {
               setVehiclePhotos([...vehiclePhotos, imageUpload]);
             } else {
-              showError("Limit Reached", "Maximum 4 vehicle photos allowed");
+              showError("Limit Reached", "Maximum 3 vehicle photos allowed");
             }
             break;
           case "license-front":
@@ -115,12 +103,6 @@ export default function DriverRegistrationScreen() {
             break;
           case "license-back":
             setLicenseBack(imageUpload);
-            break;
-          case "registration":
-            setRegistrationPhoto(imageUpload);
-            break;
-          case "insurance":
-            setInsurancePhoto(imageUpload);
             break;
         }
       }
@@ -137,9 +119,13 @@ export default function DriverRegistrationScreen() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!vehicleMake.trim()) newErrors.vehicleMake = "Make is required";
-    if (!vehicleModel.trim()) newErrors.vehicleModel = "Model is required";
-    if (!vehicleYear.trim()) newErrors.vehicleYear = "Year is required";
+    // Car-only fields
+    if (vehicleType === "car") {
+      if (!vehicleMake.trim()) newErrors.vehicleMake = "Make is required";
+      if (!vehicleModel.trim()) newErrors.vehicleModel = "Model is required";
+      if (!vehicleYear.trim()) newErrors.vehicleYear = "Year is required";
+    }
+
     if (!vehicleColor.trim()) newErrors.vehicleColor = "Color is required";
     if (!plateNumber.trim()) newErrors.plateNumber = "Plate number is required";
     if (vehiclePhotos.length === 0)
@@ -152,13 +138,6 @@ export default function DriverRegistrationScreen() {
     if (!licenseFront)
       newErrors.licenseFront = "License front photo is required";
     if (!licenseBack) newErrors.licenseBack = "License back photo is required";
-
-    if (!registrationNumber.trim())
-      newErrors.registrationNumber = "Registration number is required";
-    if (!registrationPhoto)
-      newErrors.registrationPhoto = "Registration photo is required";
-    if (!insurancePhoto)
-      newErrors.insurancePhoto = "Insurance photo is required";
 
     if (!bankName.trim()) newErrors.bankName = "Bank name is required";
     if (!accountNumber.trim())
@@ -199,22 +178,11 @@ export default function DriverRegistrationScreen() {
         licenseBack!.uri,
         "driver_licenses",
       );
-      const registrationUrl = await uploadImage(
-        registrationPhoto!.uri,
-        "vehicle_registrations",
-      );
-      const insuranceUrl = await uploadImage(
-        insurancePhoto!.uri,
-        "vehicle_registrations",
-      );
 
-      // Update driver document
-      await updateDoc(doc(db, "drivers", uid), {
+      // Build update data
+      const updateData: Record<string, any> = {
         status: "active",
         vehicleType,
-        vehicleMake,
-        vehicleModel,
-        vehicleYear: parseInt(vehicleYear),
         vehicleColor,
         plateNumber: plateNumber.toUpperCase(),
         vehiclePhotos: vehiclePhotoUrls,
@@ -222,17 +190,24 @@ export default function DriverRegistrationScreen() {
         licenseExpiry: new Date(licenseExpiry),
         licenseFrontPhoto: licenseFrontUrl,
         licenseBackPhoto: licenseBackUrl,
-        registrationNumber: registrationNumber.toUpperCase(),
-        registrationPhoto: registrationUrl,
-        insurancePhoto: insuranceUrl,
         bankName,
         accountNumber,
         accountName,
+        payout_pref: payoutPref,
         updatedAt: serverTimestamp(),
-      });
+      };
 
-      showSuccess("Registration Complete", "You can now go online!");
-      router.back();
+      // Car-only fields
+      if (vehicleType === "car") {
+        updateData.vehicleMake = vehicleMake;
+        updateData.vehicleModel = vehicleModel;
+        updateData.vehicleYear = vehicleYear ? parseInt(vehicleYear) : null;
+      }
+
+      await updateDoc(doc(db, "drivers", uid), updateData);
+
+      showSuccess("Registration Complete", "Your details have been saved");
+      router.push("/(auth)/pin-setup");
     } catch (error: any) {
       console.error("Registration error:", error);
       showError(
@@ -243,6 +218,21 @@ export default function DriverRegistrationScreen() {
       setLoading(false);
     }
   };
+
+  const vehicleTypes: { type: VehicleType; label: string }[] = [
+    { type: "car", label: "Car" },
+    { type: "tricycle", label: "Tricycle" },
+    { type: "bus", label: "Bus" },
+  ];
+
+  const payoutOptions: {
+    value: PayoutPreference;
+    label: string;
+    description: string;
+  }[] = [
+    { value: "daily", label: "Daily", description: "Paid out every day" },
+    { value: "weekly", label: "Weekly", description: "Paid out every week" },
+  ];
 
   const styles = StyleSheet.create({
     container: {
@@ -271,6 +261,75 @@ export default function DriverRegistrationScreen() {
     section: {
       marginBottom: spacing.xl,
     },
+    vehicleTypeLabel: {
+      fontSize: typography.sizes.sm,
+      fontWeight: "500",
+      color: colors.textSecondary,
+      marginBottom: spacing.sm,
+    },
+    vehicleTypeRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    vehicleTypeCard: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: colors.surface,
+    },
+    vehicleTypeCardActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "10",
+    },
+    vehicleTypeText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textSecondary,
+    },
+    vehicleTypeTextActive: {
+      color: colors.primary,
+    },
+    payoutLabel: {
+      fontSize: typography.sizes.sm,
+      fontWeight: "500",
+      color: colors.textSecondary,
+      marginBottom: spacing.sm,
+    },
+    payoutRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    payoutCard: {
+      flex: 1,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    payoutCardActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "10",
+    },
+    payoutCardLabel: {
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textSecondary,
+      marginBottom: spacing.xs,
+    },
+    payoutCardLabelActive: {
+      color: colors.primary,
+    },
+    payoutCardDesc: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textMuted,
+    },
   });
 
   return (
@@ -285,48 +344,70 @@ export default function DriverRegistrationScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Driver Registration</Text>
+            <Text style={styles.title}>Vehicle Details</Text>
             <Text style={styles.subtitle}>
-              Complete your profile to start accepting rides
+              Complete your vehicle and bank details to start accepting rides
             </Text>
           </View>
 
-          {/* Vehicle Information */}
+          {/* VEHICLE SECTION */}
           <View style={styles.section}>
             <SectionHeader title="Vehicle Information" />
 
-            <VehicleTypeSelector
-              selectedType={vehicleType}
-              onSelectType={setVehicleType}
-            />
+            {/* Vehicle type selector */}
+            <Text style={styles.vehicleTypeLabel}>Vehicle Type</Text>
+            <View style={styles.vehicleTypeRow}>
+              {vehicleTypes.map(({ type, label }) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.vehicleTypeCard,
+                    vehicleType === type && styles.vehicleTypeCardActive,
+                  ]}
+                  onPress={() => setVehicleType(type)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.vehicleTypeText,
+                      vehicleType === type && styles.vehicleTypeTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-            <Input
-              label="Vehicle Make"
-              value={vehicleMake}
-              onChangeText={setVehicleMake}
-              placeholder="e.g., Toyota"
-              error={errors.vehicleMake}
-            />
-
-            <Input
-              label="Vehicle Model"
-              value={vehicleModel}
-              onChangeText={setVehicleModel}
-              placeholder="e.g., Camry"
-              error={errors.vehicleModel}
-            />
-
-            <Input
-              label="Year"
-              value={vehicleYear}
-              onChangeText={setVehicleYear}
-              placeholder="e.g., 2020"
-              keyboardType="number-pad"
-              error={errors.vehicleYear}
-              maxLength={4}
-            />
+            {/* Car-only fields */}
+            {vehicleType === "car" && (
+              <>
+                <Input
+                  label="Make"
+                  value={vehicleMake}
+                  onChangeText={setVehicleMake}
+                  placeholder="e.g., Toyota"
+                  error={errors.vehicleMake}
+                />
+                <Input
+                  label="Model"
+                  value={vehicleModel}
+                  onChangeText={setVehicleModel}
+                  placeholder="e.g., Camry"
+                  error={errors.vehicleModel}
+                />
+                <Input
+                  label="Year"
+                  value={vehicleYear}
+                  onChangeText={setVehicleYear}
+                  placeholder="e.g., 2020"
+                  keyboardType="number-pad"
+                  error={errors.vehicleYear}
+                  maxLength={4}
+                />
+              </>
+            )}
 
             <Input
               label="Color"
@@ -349,27 +430,27 @@ export default function DriverRegistrationScreen() {
               photos={vehiclePhotos}
               onAddPhoto={() => pickImage("vehicle")}
               onRemovePhoto={removeVehiclePhoto}
-              maxPhotos={4}
-              label="Vehicle Photos (Max 4)"
+              maxPhotos={3}
+              label="Vehicle Photos (Max 3)"
               error={errors.vehiclePhotos}
             />
           </View>
 
-          {/* Driver License */}
+          {/* LICENCE SECTION */}
           <View style={styles.section}>
-            <SectionHeader title="Driver License" />
+            <SectionHeader title="Driver Licence" />
 
             <Input
-              label="License Number"
+              label="Licence Number"
               value={licenseNumber}
               onChangeText={(text) => setLicenseNumber(text.toUpperCase())}
-              placeholder="License number"
+              placeholder="Licence number"
               error={errors.licenseNumber}
               autoCapitalize="characters"
             />
 
             <Input
-              label="License Expiry Date"
+              label="Licence Expiry Date"
               value={licenseExpiry}
               onChangeText={setLicenseExpiry}
               placeholder="YYYY-MM-DD"
@@ -378,49 +459,21 @@ export default function DriverRegistrationScreen() {
             />
 
             <DocumentUploadButton
-              label="License Front"
+              label="Licence Front"
               document={licenseFront}
               onUpload={() => pickImage("license-front")}
               error={errors.licenseFront}
             />
 
             <DocumentUploadButton
-              label="License Back"
+              label="Licence Back"
               document={licenseBack}
               onUpload={() => pickImage("license-back")}
               error={errors.licenseBack}
             />
           </View>
 
-          {/* Vehicle Documents */}
-          <View style={styles.section}>
-            <SectionHeader title="Vehicle Documents" />
-
-            <Input
-              label="Registration Number"
-              value={registrationNumber}
-              onChangeText={(text) => setRegistrationNumber(text.toUpperCase())}
-              placeholder="Registration number"
-              error={errors.registrationNumber}
-              autoCapitalize="characters"
-            />
-
-            <DocumentUploadButton
-              label="Registration"
-              document={registrationPhoto}
-              onUpload={() => pickImage("registration")}
-              error={errors.registrationPhoto}
-            />
-
-            <DocumentUploadButton
-              label="Insurance"
-              document={insurancePhoto}
-              onUpload={() => pickImage("insurance")}
-              error={errors.insurancePhoto}
-            />
-          </View>
-
-          {/* Bank Account */}
+          {/* BANK ACCOUNT SECTION */}
           <View style={styles.section}>
             <SectionHeader title="Bank Account" />
 
@@ -450,9 +503,34 @@ export default function DriverRegistrationScreen() {
               placeholder="Account holder name"
               error={errors.accountName}
             />
+
+            {/* Payout Preference */}
+            <Text style={styles.payoutLabel}>Payout Preference</Text>
+            <View style={styles.payoutRow}>
+              {payoutOptions.map(({ value, label, description }) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[
+                    styles.payoutCard,
+                    payoutPref === value && styles.payoutCardActive,
+                  ]}
+                  onPress={() => setPayoutPref(value)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.payoutCardLabel,
+                      payoutPref === value && styles.payoutCardLabelActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                  <Text style={styles.payoutCardDesc}>{description}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
-          {/* Submit Button */}
           <Button
             title="Complete Registration"
             onPress={handleSubmit}

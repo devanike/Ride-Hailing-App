@@ -7,23 +7,18 @@ import {
   Unsubscribe,
   User,
   UserCredential,
-} from 'firebase/auth';
-import { auth } from './firebaseConfig';
+} from "firebase/auth";
+import { auth } from "./firebaseConfig";
 
-/**
- * Auth Service
- * Handles Firebase Authentication with Phone Number (React Native)
- */
+// Auth Service - Handles Firebase Authentication with Phone Number
 
-/**
- * Simple verifier for React Native
- * Firebase will use test numbers if configured in Console
- */
+// Simple verifier for React Native
+// Firebase will use test numbers if configured in Firebase Console
 class InvisibleVerifier implements ApplicationVerifier {
-  type = 'recaptcha' as const;
-  
+  type = "recaptcha" as const;
+
   async verify(): Promise<string> {
-    return '';
+    return "";
   }
 
   clear() {
@@ -35,83 +30,76 @@ class InvisibleVerifier implements ApplicationVerifier {
   }
 }
 
-// Create verifier instance
 const verifier = new InvisibleVerifier();
 
-/**
- * Send OTP to phone number
- * Works with test phone numbers configured in Firebase Console
- */
+// Send OTP to phone number
+// Works with test phone numbers configured in Firebase Console
 export const sendPhoneOTP = async (
-  phoneNumber: string
+  phoneNumber: string,
 ): Promise<ConfirmationResult> => {
   try {
-    console.log('📱 Sending OTP to:', phoneNumber);
-    
-    if (!phoneNumber.startsWith('+')) {
-      throw new Error('Phone number must be in E.164 format (e.g., +2348012345678)');
+    console.log("Sending OTP to:", phoneNumber);
+
+    if (!phoneNumber.startsWith("+")) {
+      throw new Error(
+        "Phone number must be in E.164 format (e.g., +2348012345678)",
+      );
     }
 
     const confirmationResult = await signInWithPhoneNumber(
       auth,
       phoneNumber,
-      verifier
+      verifier,
     );
 
-    console.log('✅ OTP request successful');
+    console.log("OTP request successful");
     return confirmationResult;
   } catch (error: any) {
-    console.error('❌ Error sending OTP:', error);
-    console.error('Error code:', error.code);
-    
-    if (error.code === 'auth/argument-error') {
-      throw new Error('Please ensure test phone numbers are configured in Firebase Console');
+    console.error("Error sending OTP:", error);
+    console.error("Error code:", error.code);
+
+    if (error.code === "auth/argument-error") {
+      throw new Error(
+        "Please ensure test phone numbers are configured in Firebase Console",
+      );
     }
-    
-    throw new Error(error.message || 'Failed to send OTP');
+
+    throw new Error(error.message || "Failed to send OTP");
   }
 };
 
-/**
- * Verify OTP code
- */
+// Verify OTP code
 export const verifyOTP = async (
   confirmationResult: ConfirmationResult,
-  code: string
+  code: string,
 ): Promise<UserCredential> => {
   try {
     const userCredential = await confirmationResult.confirm(code);
     return userCredential;
   } catch (error: any) {
-    console.error('Error verifying OTP:', error);
-    throw new Error('Invalid OTP code');
+    console.error("Error verifying OTP:", error);
+    throw new Error("Invalid OTP code");
   }
 };
 
-/**
- * Get current authenticated user
- */
+// Get current authenticated user
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
 };
 
-/**
- * Logout current user
- */
+// Logout current user
 export const logout = async (): Promise<void> => {
   try {
     await signOut(auth);
   } catch (error: any) {
-    console.error('Error logging out:', error);
-    throw new Error('Failed to logout');
+    console.error("Error logging out:", error);
+    throw new Error("Failed to logout");
   }
 };
 
-/**
- * Listen to auth state changes
- */
+// Listen to auth state changes
 export const onAuthStateChanged = (
-  callback: (user: User | null) => void
+  callback: (user: User | null) => void,
 ): Unsubscribe => {
   return firebaseOnAuthStateChanged(auth, callback);
 };

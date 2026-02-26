@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Modal, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type SetupStep = "create" | "confirm" | "biometric";
+type SetupStep = "create" | "confirm";
 
 export default function PINSetupScreen() {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
@@ -36,23 +36,13 @@ export default function PINSetupScreen() {
     setError(false);
   }, [currentStep]);
 
-  /**
-   * Complete PIN setup and trigger auth state refresh
-   * _layout.tsx will handle navigation based on user type
-   */
   const completeSetup = useCallback(async () => {
     try {
-      const successMessage = isReset
-        ? "PIN Reset Successfully"
-        : "Account Created";
-      const successDescription = isReset
-        ? "Your PIN has been reset successfully"
-        : "Your account has been set up successfully";
-
-      showSuccess(successMessage, successDescription);
-
-      // Trigger auth state refresh in _layout.tsx
-      // This will cause _layout.tsx to re-evaluate auth state and navigate appropriately
+      showSuccess(
+        isReset ? "PIN Reset" : "Account Created",
+        isReset ? "Your PIN has been reset" : "Your account has been set up",
+      );
+      // _layout.tsx re-evaluates auth state and navigates to correct home
       refreshAuthState();
     } catch (err) {
       console.error("Error completing setup:", err);
@@ -83,28 +73,17 @@ export default function PINSetupScreen() {
       try {
         setLoading(true);
 
-        // Setup PIN
-        const success = await setupPIN(pin);
+        await setupPIN(pin);
 
-        if (!success) {
-          showError("Setup Failed", "Failed to setup PIN. Please try again.");
-          setCurrentStep("create");
-          setFirstPin("");
-          return;
-        }
-
-        // Mark device as known (only for new setup, not reset)
         if (!isReset) {
           await markDeviceAsKnown();
         }
 
-        // Check biometric availability
         const biometric = await getBiometricCapability();
 
         if (biometric.available) {
           setShowBiometricModal(true);
         } else {
-          // No biometric, complete setup
           await completeSetup();
         }
       } catch (err: any) {
@@ -142,14 +121,7 @@ export default function PINSetupScreen() {
     if (isReset) {
       return currentStep === "create" ? "Reset Your PIN" : "Confirm New PIN";
     }
-    switch (currentStep) {
-      case "create":
-        return "Create Your PIN";
-      case "confirm":
-        return "Confirm Your PIN";
-      default:
-        return "Setup Complete";
-    }
+    return currentStep === "create" ? "Create Your PIN" : "Confirm Your PIN";
   };
 
   const getSubtitle = () => {
@@ -158,14 +130,9 @@ export default function PINSetupScreen() {
         ? "Choose a new 6-digit PIN"
         : "Enter your new PIN again to confirm";
     }
-    switch (currentStep) {
-      case "create":
-        return "Choose a 6-digit PIN to secure your account";
-      case "confirm":
-        return "Enter your PIN again to confirm";
-      default:
-        return "";
-    }
+    return currentStep === "create"
+      ? "Choose a 6-digit PIN to secure your account"
+      : "Enter your PIN again to confirm";
   };
 
   const styles = StyleSheet.create({
@@ -261,9 +228,7 @@ export default function PINSetupScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
-          {/* Progress Indicator - only show for new setup */}
           {!isReset && (
             <View style={styles.progressContainer}>
               <View
@@ -285,7 +250,6 @@ export default function PINSetupScreen() {
           <Text style={styles.subtitle}>{getSubtitle()}</Text>
         </View>
 
-        {/* PIN Pad - Use key to force remount and clear state */}
         <PINPad
           key={pinKey}
           length={6}
@@ -300,7 +264,7 @@ export default function PINSetupScreen() {
         />
       </View>
 
-      {/* Biometric Setup Modal */}
+      {/* Biometric Modal */}
       <Modal
         visible={showBiometricModal}
         transparent
@@ -313,9 +277,9 @@ export default function PINSetupScreen() {
               <Fingerprint size={40} color={colors.primary} />
             </View>
 
-            <Text style={styles.modalTitle}>Enable Fingerprint?</Text>
+            <Text style={styles.modalTitle}>Enable Fingerprint Login?</Text>
             <Text style={styles.modalDescription}>
-              Use your fingerprint to quickly and securely access your account
+              Use your fingerprint to log in faster and more securely
             </Text>
 
             <View style={styles.modalButtons}>

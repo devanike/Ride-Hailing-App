@@ -2,10 +2,10 @@ import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { useTheme } from "@/hooks/useTheme";
 import { sendPhoneOTP, verifyOTP } from "@/services/authService";
-import { auth } from "@/services/firebaseConfig";
+import { deletePIN } from "@/services/securityService";
 import { showError, showSuccess } from "@/utils/toast";
 import { router } from "expo-router";
-import { Phone } from "lucide-react-native";
+import { CheckCircle, Phone } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -25,7 +25,6 @@ type ForgotPinStep = "phone" | "otp" | "complete";
 export default function ForgotPinScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
 
-  // States
   const [currentStep, setCurrentStep] = useState<ForgotPinStep>("phone");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -37,7 +36,7 @@ export default function ForgotPinScreen() {
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
-  // Timer for resend
+  // Countdown timer
   useEffect(() => {
     if (currentStep === "otp" && resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -72,18 +71,7 @@ export default function ForgotPinScreen() {
       setLoading(true);
       const formattedPhone = `+234${phone}`;
 
-      // Check if user exists
-      const userExists = auth.currentUser?.phoneNumber === formattedPhone;
-
-      if (!userExists) {
-        showError(
-          "Account Not Found",
-          "No account found with this phone number",
-        );
-        return;
-      }
-
-      // Send OTP
+      // Send OTP regardless — Firebase will verify the number exists
       const result = await sendPhoneOTP(formattedPhone);
       setConfirmationResult(result);
       setCurrentStep("otp");
@@ -103,12 +91,10 @@ export default function ForgotPinScreen() {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all filled
     if (newOtp.every((digit) => digit !== "") && index === 5) {
       handleVerifyOTP(newOtp.join(""));
     }
@@ -131,13 +117,14 @@ export default function ForgotPinScreen() {
     try {
       setLoading(true);
 
-      // Verify OTP
       await verifyOTP(confirmationResult, otpCode);
+
+      // Delete existing PIN before navigating to setup new one
+      await deletePIN();
 
       setCurrentStep("complete");
       showSuccess("Verified", "OTP verified successfully");
 
-      // Navigate to PIN setup after short delay
       setTimeout(() => {
         router.replace({
           pathname: "/(auth)/pin-setup",
@@ -258,12 +245,6 @@ export default function ForgotPinScreen() {
       paddingVertical: spacing.xxl,
     },
     successIcon: {
-      width: 80,
-      height: 80,
-      borderRadius: borderRadius.full,
-      backgroundColor: colors.success,
-      justifyContent: "center",
-      alignItems: "center",
       marginBottom: spacing.lg,
     },
     successText: {
@@ -271,6 +252,7 @@ export default function ForgotPinScreen() {
       fontFamily: typography.fonts.headingSemiBold,
       color: colors.success,
       textAlign: "center",
+      marginBottom: spacing.sm,
     },
     footer: {
       marginTop: "auto",
@@ -290,7 +272,7 @@ export default function ForgotPinScreen() {
   const renderPhoneStep = () => (
     <>
       <View style={styles.header}>
-        <Text style={styles.title}>Forgot PIN?</Text>
+        <Text style={styles.title}>Reset PIN</Text>
         <Text style={styles.subtitle}>
           Enter your phone number to receive a verification code
         </Text>
@@ -411,9 +393,9 @@ export default function ForgotPinScreen() {
   const renderCompleteStep = () => (
     <View style={styles.successContainer}>
       <View style={styles.successIcon}>
-        <Text style={{ fontSize: 40 }}>✓</Text>
+        <CheckCircle size={72} color={colors.success} />
       </View>
-      <Text style={styles.successText}>Verification Successful!</Text>
+      <Text style={styles.successText}>Verification Successful</Text>
       <Text style={styles.subtitle}>Redirecting to PIN setup...</Text>
     </View>
   );
