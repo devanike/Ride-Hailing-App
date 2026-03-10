@@ -1,6 +1,6 @@
-import { useTheme } from '@/hooks/useTheme';
-import { AlertTriangle, X } from 'lucide-react-native';
-import React from 'react';
+import { useTheme } from "@/hooks/useTheme";
+import { AlertTriangle } from "lucide-react-native";
+import React from "react";
 import {
   Modal,
   Pressable,
@@ -8,25 +8,21 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { Button } from './Button';
+} from "react-native";
 
 interface OutsideCampusModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-  locationType: 'pickup' | 'dropoff';
 }
 
 /**
  * Outside Campus Modal
- * Warns users when they select a location outside campus boundaries
+ * Bottom sheet style warning shown when a location outside
+ * the University of Ibadan campus boundary is selected.
  */
 export const OutsideCampusModal: React.FC<OutsideCampusModalProps> = ({
   visible,
   onClose,
-  onConfirm,
-  locationType,
 }) => {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
 
@@ -34,128 +30,92 @@ export const OutsideCampusModal: React.FC<OutsideCampusModalProps> = ({
     overlay: {
       flex: 1,
       backgroundColor: colors.overlay,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: spacing.screenPadding,
+      justifyContent: "flex-end",
     },
-    modalContainer: {
-      backgroundColor: colors.surface.light,
-      borderRadius: borderRadius.xl,
-      padding: spacing.xl,
-      width: '100%',
-      maxWidth: 400,
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.xl,
+      paddingHorizontal: spacing.screenPadding,
+      alignItems: "center",
       ...shadows.large,
     },
-    closeButton: {
-      position: 'absolute',
-      top: spacing.base,
-      right: spacing.base,
-      padding: spacing.xs,
-      zIndex: 1,
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      marginBottom: spacing.xl,
     },
     iconContainer: {
-      width: 80,
-      height: 80,
+      width: 72,
+      height: 72,
       borderRadius: borderRadius.full,
-      backgroundColor: colors.status.warningLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      alignSelf: 'center',
+      backgroundColor: colors.warningBackground,
+      alignItems: "center",
+      justifyContent: "center",
       marginBottom: spacing.lg,
     },
     title: {
       fontSize: typography.sizes.xl,
       fontFamily: typography.fonts.headingSemiBold,
-      color: colors.text.primary,
-      textAlign: 'center',
+      color: colors.textPrimary,
+      textAlign: "center",
       marginBottom: spacing.sm,
     },
     message: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
-      color: colors.text.secondary,
-      textAlign: 'center',
+      color: colors.textSecondary,
+      textAlign: "center",
       lineHeight: typography.sizes.base * typography.lineHeights.normal,
-      marginBottom: spacing.base,
-    },
-    warningBox: {
-      backgroundColor: colors.status.warningLight,
-      padding: spacing.base,
-      borderRadius: borderRadius.md,
       marginBottom: spacing.xl,
-      borderLeftWidth: 4,
-      borderLeftColor: colors.status.warning,
     },
-    warningText: {
-      fontSize: typography.sizes.sm,
+    okButton: {
+      width: "100%",
+      paddingVertical: spacing.md,
+      backgroundColor: colors.primary,
+      borderRadius: borderRadius.md,
+      alignItems: "center",
+    },
+    okButtonText: {
+      fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
-      color: colors.status.warning,
-      lineHeight: typography.sizes.sm * typography.lineHeights.normal,
-    },
-    buttonsContainer: {
-      gap: spacing.md,
+      color: colors.textInverse,
     },
   });
-
-  const getMessage = () => {
-    if (locationType === 'pickup') {
-      return 'Your pickup location is outside the University of Ibadan campus. Our service is currently limited to on-campus rides only.';
-    }
-    return 'Your dropoff location is outside the University of Ibadan campus. Our service is currently limited to on-campus rides only.';
-  };
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={styles.modalContainer}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X size={24} color={colors.text.secondary} />
-          </TouchableOpacity>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.handle} />
 
-          {/* Warning Icon */}
           <View style={styles.iconContainer}>
-            <AlertTriangle size={40} color={colors.status.warning} />
+            <AlertTriangle size={36} color={colors.warning} />
           </View>
 
-          {/* Title */}
-          <Text style={styles.title}>Location Outside Campus</Text>
+          <Text style={styles.title}>Outside Campus</Text>
 
-          {/* Message */}
-          <Text style={styles.message}>{getMessage()}</Text>
+          <Text style={styles.message}>
+            UI-Ride only operates within the University of Ibadan campus. Please
+            select a pickup or drop-off point inside the campus boundary.
+          </Text>
 
-          {/* Warning Box */}
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              Please select a location within the campus boundaries to continue.
-            </Text>
-          </View>
-
-          {/* Buttons */}
-          <View style={styles.buttonsContainer}>
-            <Button
-              title="Choose Different Location"
-              onPress={onClose}
-              variant="primary"
-              size="large"
-              fullWidth
-            />
-            <Button
-              title="Continue Anyway"
-              onPress={onConfirm}
-              variant="outline"
-              size="large"
-              fullWidth
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.okButton}
+            onPress={onClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.okButtonText}>OK</Text>
+          </TouchableOpacity>
         </Pressable>
       </Pressable>
     </Modal>

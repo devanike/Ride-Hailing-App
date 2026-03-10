@@ -11,52 +11,40 @@ import MapView, {
   Region,
 } from "react-native-maps";
 
-/**
- * MapComponent Props
- */
+// Default centre: University of Ibadan main campus
+const DEFAULT_REGION: MapRegion = {
+  latitude: 7.4453,
+  longitude: 3.8993,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
+};
+
 export interface MapComponentProps {
-  // Initial region
   initialRegion?: MapRegion;
-
-  // Markers to display
   markers?: MapMarker[];
-
-  // Route polyline coordinates
   routeCoordinates?: Coordinates[];
-
-  // Circle overlay (for campus boundary, etc.)
   circle?: {
     center: Coordinates;
     radius: number;
     fillColor?: string;
     strokeColor?: string;
   };
-
-  // User location
   showUserLocation?: boolean;
   followUserLocation?: boolean;
-
-  // Map controls
   showsMyLocationButton?: boolean;
   showsCompass?: boolean;
   showsScale?: boolean;
   zoomEnabled?: boolean;
   scrollEnabled?: boolean;
   rotateEnabled?: boolean;
-
-  // Callbacks
   onRegionChange?: (region: Region) => void;
   onMarkerPress?: (markerId: string) => void;
   onMapPress?: (coordinate: Coordinates) => void;
   onMapReady?: () => void;
-
-  // Style
   style?: any;
+  children?: React.ReactNode;
 }
 
-/**
- * Methods exposed via ref
- */
 export interface MapComponentRef {
   animateToRegion: (region: MapRegion, duration?: number) => void;
   fitToCoordinates: (
@@ -69,7 +57,7 @@ export interface MapComponentRef {
 export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
   (
     {
-      initialRegion = MAP_CONFIG.initialRegion,
+      initialRegion = DEFAULT_REGION,
       markers = [],
       routeCoordinates = [],
       circle,
@@ -86,15 +74,18 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
       onMapPress,
       onMapReady,
       style,
+      children,
     },
     ref,
   ) => {
     const { colors } = useTheme();
     const mapRef = useRef<MapView>(null);
 
-    // Expose methods via ref
     useImperativeHandle(ref, () => ({
-      animateToRegion: (region: MapRegion, duration = 300) => {
+      animateToRegion: (
+        region: MapRegion,
+        duration = MAP_CONFIG.animationDuration,
+      ) => {
         mapRef.current?.animateToRegion(region, duration);
       },
 
@@ -109,30 +100,32 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
       },
 
       getCurrentRegion: async () => {
-        return await mapRef.current?.getCamera().then((camera) => ({
+        const camera = await mapRef.current?.getCamera();
+        if (!camera) return undefined;
+        return {
           latitude: camera.center.latitude,
           longitude: camera.center.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }));
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        };
       },
     }));
 
-    // Get marker color based on type
     const getMarkerColor = (marker: MapMarker): string => {
       if (marker.color) return marker.color;
 
       switch (marker.type) {
-        case "user":
+        case "passenger":
           return colors.primary;
         case "driver":
-          return colors.accent;
+          return colors.info;
         case "pickup":
           return colors.success;
         case "dropoff":
+        case "destination":
           return colors.error;
         case "campus_location":
-          return colors.info;
+          return colors.textMuted;
         default:
           return colors.primary;
       }
@@ -165,14 +158,9 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
           rotateEnabled={rotateEnabled}
           toolbarEnabled={false}
           onRegionChangeComplete={onRegionChange}
-          onPress={(event) => {
-            if (onMapPress) {
-              onMapPress(event.nativeEvent.coordinate);
-            }
-          }}
+          onPress={(event) => onMapPress?.(event.nativeEvent.coordinate)}
           onMapReady={onMapReady}
         >
-          {/* Markers */}
           {markers.map((marker) => (
             <Marker
               key={marker.id}
@@ -186,7 +174,6 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
             </Marker>
           ))}
 
-          {/* Route Polyline */}
           {routeCoordinates.length > 0 && (
             <Polyline
               coordinates={routeCoordinates}
@@ -196,7 +183,6 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
             />
           )}
 
-          {/* Circle Overlay */}
           {circle && (
             <Circle
               center={circle.center}
@@ -206,6 +192,8 @@ export const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
               strokeWidth={2}
             />
           )}
+
+          {children}
         </MapView>
       </View>
     );

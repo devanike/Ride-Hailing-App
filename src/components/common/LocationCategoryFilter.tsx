@@ -1,5 +1,5 @@
 import { useTheme } from "@/hooks/useTheme";
-import { LocationCategory } from "@/types/locations";
+import { LocationCategory, LocationCategoryValue } from "@/types/locations";
 import {
   BookOpen,
   Building,
@@ -20,12 +20,12 @@ import {
 } from "react-native";
 
 interface CategoryFilterProps {
-  selectedCategory: LocationCategory | "all";
-  onSelectCategory: (category: LocationCategory | "all") => void;
+  selectedCategory: LocationCategoryValue | "all";
+  onSelectCategory: (category: LocationCategoryValue | "all") => void;
 }
 
 interface CategoryItem {
-  value: LocationCategory | "all";
+  value: LocationCategoryValue | "all";
   label: string;
   Icon: LucideIcon;
 }

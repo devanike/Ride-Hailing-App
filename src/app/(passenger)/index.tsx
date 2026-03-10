@@ -1,14 +1,23 @@
-import { Button } from "@/components/common/Button";
-import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { DriverMarker } from "@/components/map/DriverMarker";
 import { MapComponent, MapComponentRef } from "@/components/map/MapComponent";
 import { useLocation } from "@/hooks/useLocation";
 import { useTheme } from "@/hooks/useTheme";
-import { showError } from "@/utils/toast";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { router, useLocalSearchParams } from "expo-router";
-import { MapPin, Navigation, Search } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { auth, db } from "@/services/firebaseConfig";
+import { Collections } from "@/types/database";
+import { Ride, RideStatus } from "@/types/ride";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { Href, router } from "expo-router";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { Navigation } from "lucide-react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   StatusBar,
   StyleSheet,
@@ -16,143 +25,138 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-/**
- * Passenger Home Screen
- * Main screen with map and ride request functionality
- */
+interface DriverLocation {
+  driverId: string;
+  driverName?: string;
+  latitude: number;
+  longitude: number;
+  isOnline: boolean;
+}
+
+const ACTIVE_RIDE_STATUSES: RideStatus[] = [
+  "pending",
+  "accepted",
+  "in_progress",
+];
+
+const STATUS_LABELS: Record<RideStatus, string> = {
+  pending: "Looking for a driver...",
+  accepted: "Driver is on the way",
+  in_progress: "Ride in progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+// NOTE: TypeScript will show an error on active-ride until (passenger)/active-ride.tsx is created.
+const RIDE_SCREEN: Partial<Record<RideStatus, string>> = {
+  pending: "/(passenger)/driver-offers",
+  accepted: "/(passenger)/active-ride",
+  in_progress: "/(passenger)/active-ride",
+};
+
 export default function PassengerHomeScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const { location, loading, error, hasPermission, requestPermission } =
-    useLocation();
+  const { location, loading: locationLoading } = useLocation();
 
-  const [pickupLocation, setPickupLocation] = useState<string>("");
-  const [dropoffLocation, setDropoffLocation] = useState<string>("");
+  const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
+  const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([]);
+  const [activeRide, setActiveRide] = useState<Ride | null>(null);
 
-  // Get location data returned from location-selection screen
-  const params = useLocalSearchParams();
-  const selectedLocation = params.selectedLocation as string | undefined;
-  const locationType = params.locationType as "pickup" | "dropoff" | undefined;
+  const snapPoints = useMemo(() => ["22%", "40%"], []);
 
-  // Handle returned location from location-selection screen
   useEffect(() => {
-    if (selectedLocation && locationType) {
-      if (locationType === "pickup") {
-        setPickupLocation(selectedLocation);
-      } else if (locationType === "dropoff") {
-        setDropoffLocation(selectedLocation);
-      }
-    }
-  }, [selectedLocation, locationType]);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return unsub;
+  }, []);
 
-  // Animate to user location when available
   useEffect(() => {
     if (location) {
-      try {
-        mapRef.current?.animateToRegion(
-          {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          300,
-        );
-      } catch (err) {
-        console.error("Error animating to location:", err);
-      }
+      mapRef.current?.animateToRegion(
+        {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        300,
+      );
     }
   }, [location]);
 
-  const handleRequestLocation = useCallback(async (): Promise<void> => {
-    try {
-      if (!hasPermission) {
-        await requestPermission();
+  useEffect(() => {
+    const q = query(
+      collection(db, Collections.DRIVER_LOCATIONS),
+      where("isOnline", "==", true),
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const locations: DriverLocation[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        locations.push({
+          driverId: doc.id,
+          driverName: data.driverName,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          isOnline: data.isOnline,
+        });
+      });
+      setDriverLocations(locations);
+    });
+
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const q = query(
+      collection(db, Collections.RIDES),
+      where("passengerId", "==", currentUser.uid),
+      where("status", "in", ACTIVE_RIDE_STATUSES),
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        setActiveRide({ rideId: doc.id, ...doc.data() } as Ride);
+      } else {
+        setActiveRide(null);
       }
-    } catch (err) {
-      console.error("Error requesting location permission:", err);
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to request location permission";
-      showError("Permission Error", errorMessage);
-    }
-  }, [hasPermission, requestPermission]);
+    });
 
-  const handleSelectPickup = useCallback((): void => {
-    try {
-      router.push({
-        pathname: "/location-selection",
-        params: { type: "pickup" },
-      });
-    } catch (err) {
-      console.error("Navigation error:", err);
-      showError("Error", "Failed to open location selection");
-    }
+    return unsub;
+  }, [currentUser?.uid]);
+
+  const handleWhereAreYouGoing = useCallback((): void => {
+    router.push("/(passenger)/location-selection" as Href);
   }, []);
 
-  const handleSelectDropoff = useCallback((): void => {
-    try {
-      router.push({
-        pathname: "/location-selection",
-        params: { type: "dropoff" },
-      });
-    } catch (err) {
-      console.error("Navigation error:", err);
-      showError("Error", "Failed to open location selection");
+  const handleActiveRidePress = useCallback((): void => {
+    if (!activeRide) return;
+    const screen = RIDE_SCREEN[activeRide.status];
+    if (screen) {
+      router.push(screen as Href);
     }
-  }, []);
-
-  const handleRequestRide = useCallback((): void => {
-    if (!pickupLocation || !dropoffLocation) {
-      showError(
-        "Incomplete Information",
-        "Please select both pickup and dropoff locations",
-      );
-      return;
-    }
-
-    try {
-      router.push("/(passenger)/driver-offers");
-    } catch (err) {
-      console.error("Navigation error:", err);
-      showError("Error", "Failed to find drivers. Please try again.");
-    }
-  }, [pickupLocation, dropoffLocation]);
-
-  const handleRetryLocation = useCallback(async (): Promise<void> => {
-    try {
-      await requestPermission();
-    } catch (err) {
-      console.error("Retry location error:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to get location";
-      showError("Error", errorMessage);
-    }
-  }, [requestPermission]);
+  }, [activeRide]);
 
   const handleCenterMap = useCallback((): void => {
     if (location) {
-      try {
-        mapRef.current?.animateToRegion(
-          {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          300,
-        );
-      } catch (err) {
-        console.error("Error centering map:", err);
-        showError("Error", "Failed to center map on your location");
-      }
-    } else {
-      showError("Location Unavailable", "Unable to get your current location");
+      mapRef.current?.animateToRegion(
+        {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        300,
+      );
     }
   }, [location]);
 
@@ -164,31 +168,9 @@ export default function PassengerHomeScreen(): React.JSX.Element {
     map: {
       flex: 1,
     },
-    header: {
+    centerButton: {
       position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      paddingTop: spacing.xl,
-      paddingHorizontal: spacing.screenPadding,
-      paddingBottom: spacing.md,
-      backgroundColor: colors.surface,
-      ...shadows.medium,
-    },
-    greeting: {
-      fontSize: typography.sizes.xl,
-      fontFamily: typography.fonts.heading,
-      color: colors.textPrimary,
-    },
-    subGreeting: {
-      fontSize: typography.sizes.sm,
-      fontFamily: typography.fonts.bodyRegular,
-      color: colors.textSecondary,
-      marginTop: spacing.xs / 2,
-    },
-    myLocationButton: {
-      position: "absolute",
-      top: 140,
+      bottom: "28%",
       right: spacing.screenPadding,
       width: 48,
       height: 48,
@@ -198,240 +180,134 @@ export default function PassengerHomeScreen(): React.JSX.Element {
       justifyContent: "center",
       ...shadows.medium,
     },
-    bottomSheetContent: {
-      padding: spacing.screenPadding,
-    },
-    sheetTitle: {
-      fontSize: typography.sizes.xl,
-      fontFamily: typography.fonts.headingSemiBold,
-      color: colors.textPrimary,
-      marginBottom: spacing.lg,
-    },
-    locationInputContainer: {
-      marginBottom: spacing.md,
-    },
-    locationInput: {
-      flexDirection: "row",
-      alignItems: "center",
+    sheetBackground: {
       backgroundColor: colors.surface,
-      padding: spacing.md,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+    },
+    sheetContent: {
+      paddingHorizontal: spacing.screenPadding,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xl,
+    },
+    whereButton: {
+      backgroundColor: colors.primary,
+      borderRadius: borderRadius.md,
+      paddingVertical: spacing.md + 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    whereButtonText: {
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textInverse,
+    },
+    activeRideCard: {
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.md,
       borderWidth: 1,
       borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      ...shadows.small,
     },
-    locationInputFilled: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary + "10",
-    },
-    locationIcon: {
-      marginRight: spacing.md,
-    },
-    locationTextContainer: {
-      flex: 1,
-    },
-    locationLabel: {
+    activeRideLabel: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: spacing.xs,
+    },
+    activeRideStatus: {
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.headingSemiBold,
+      color: colors.primary,
       marginBottom: spacing.xs / 2,
     },
-    locationText: {
-      fontSize: typography.sizes.base,
+    activeRideHint: {
+      fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
     },
-    locationTextFilled: {
-      color: colors.textPrimary,
-      fontFamily: typography.fonts.bodyMedium,
-    },
-    divider: {
-      height: 1,
+    indicator: {
       backgroundColor: colors.border,
-      marginVertical: spacing.md,
-    },
-    requestButton: {
-      marginTop: spacing.md,
-    },
-    permissionContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: spacing.xl,
-    },
-    permissionText: {
-      fontSize: typography.sizes.base,
-      fontFamily: typography.fonts.bodyRegular,
-      color: colors.textSecondary,
-      textAlign: "center",
-      marginBottom: spacing.lg,
-      marginTop: spacing.md,
-    },
-    errorContainer: {
-      position: "absolute",
-      top: 100,
-      left: spacing.screenPadding,
-      right: spacing.screenPadding,
-      zIndex: 1000,
     },
   });
-
-  // Show permission request if needed
-  if (!hasPermission) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.permissionContainer}>
-          <MapPin size={64} color={colors.textMuted} />
-          <Text style={styles.permissionText}>
-            We need your location to show nearby drivers and enable ride
-            tracking.
-          </Text>
-          <Button
-            title="Enable Location"
-            onPress={handleRequestLocation}
-            variant="primary"
-            size="large"
-            loading={loading}
-            disabled={loading}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Map */}
       <MapComponent
         ref={mapRef}
         style={styles.map}
         showUserLocation
         followUserLocation={false}
-      />
-
-      {/* Error Banner */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <ErrorMessage
-            message={error}
-            onRetry={handleRetryLocation}
-            type="error"
+        showsMyLocationButton={false}
+      >
+        {driverLocations.map((driver) => (
+          <DriverMarker
+            key={driver.driverId}
+            coordinate={{
+              latitude: driver.latitude,
+              longitude: driver.longitude,
+            }}
+            driverId={driver.driverId}
+            driverName={driver.driverName}
+            isOnline={driver.isOnline}
           />
-        </View>
-      )}
+        ))}
+      </MapComponent>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello!</Text>
-        <Text style={styles.subGreeting}>Where would you like to go?</Text>
-      </View>
-
-      {/* My Location Button */}
       <TouchableOpacity
-        style={styles.myLocationButton}
+        style={styles.centerButton}
         onPress={handleCenterMap}
         disabled={!location}
+        activeOpacity={0.8}
       >
         <Navigation
-          size={24}
+          size={22}
           color={location ? colors.primary : colors.textMuted}
         />
       </TouchableOpacity>
 
-      {/* Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={0}
-        snapPoints={["30%", "50%", "90%"]}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-        }}
-        handleIndicatorStyle={{
-          backgroundColor: colors.border,
-        }}
+        snapPoints={snapPoints}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.indicator}
+        enablePanDownToClose={false}
       >
-        <BottomSheetScrollView
-          contentContainerStyle={styles.bottomSheetContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.sheetTitle}>Request a Ride</Text>
-
-          {/* Pickup Location */}
-          <View style={styles.locationInputContainer}>
+        <View style={styles.sheetContent}>
+          {activeRide && (
             <TouchableOpacity
-              style={[
-                styles.locationInput,
-                pickupLocation && styles.locationInputFilled,
-              ]}
-              onPress={handleSelectPickup}
+              style={styles.activeRideCard}
+              onPress={handleActiveRidePress}
+              activeOpacity={0.8}
             >
-              <View style={styles.locationIcon}>
-                <MapPin size={20} color={colors.success} />
-              </View>
-              <View style={styles.locationTextContainer}>
-                <Text style={styles.locationLabel}>Pickup Location</Text>
-                <Text
-                  style={[
-                    styles.locationText,
-                    pickupLocation && styles.locationTextFilled,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {pickupLocation || "Select pickup location"}
-                </Text>
-              </View>
-              <Search size={20} color={colors.textMuted} />
+              <Text style={styles.activeRideLabel}>Active Ride</Text>
+              <Text style={styles.activeRideStatus}>
+                {STATUS_LABELS[activeRide.status]}
+              </Text>
+              <Text style={styles.activeRideHint}>
+                Tap to view ride details
+              </Text>
             </TouchableOpacity>
-          </View>
+          )}
 
-          {/* Dropoff Location */}
-          <View style={styles.locationInputContainer}>
-            <TouchableOpacity
-              style={[
-                styles.locationInput,
-                dropoffLocation && styles.locationInputFilled,
-              ]}
-              onPress={handleSelectDropoff}
-            >
-              <View style={styles.locationIcon}>
-                <MapPin size={20} color={colors.error} />
-              </View>
-              <View style={styles.locationTextContainer}>
-                <Text style={styles.locationLabel}>Dropoff Location</Text>
-                <Text
-                  style={[
-                    styles.locationText,
-                    dropoffLocation && styles.locationTextFilled,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {dropoffLocation || "Select dropoff location"}
-                </Text>
-              </View>
-              <Search size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Request Ride Button */}
-          <View style={styles.requestButton}>
-            <Button
-              title="Find Drivers"
-              onPress={handleRequestRide}
-              variant="primary"
-              size="large"
-              fullWidth
-              disabled={!pickupLocation || !dropoffLocation}
-            />
-          </View>
-        </BottomSheetScrollView>
+          <TouchableOpacity
+            style={styles.whereButton}
+            onPress={handleWhereAreYouGoing}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.whereButtonText}>Where are you going?</Text>
+          </TouchableOpacity>
+        </View>
       </BottomSheet>
 
-      {/* Loading Overlay */}
-      {loading && (
+      {locationLoading && (
         <LoadingSpinner fullScreen message="Getting your location..." />
       )}
     </View>

@@ -1,6 +1,6 @@
 import { POPULAR_LOCATIONS, searchLocations } from "@/data/popularLocations";
 import { useTheme } from "@/hooks/useTheme";
-import { LocationCategory, PopularLocation } from "@/types/locations";
+import { LocationCategoryValue, PopularLocation } from "@/types/locations";
 import { PlaceDetails } from "@/types/places";
 import * as Icons from "lucide-react-native";
 import { LucideIcon, MapPin, Search } from "lucide-react-native";
@@ -18,7 +18,7 @@ import { LocationSearchInput } from "./LocationSearchInput";
 interface PopularLocationsProps {
   onLocationSelect: (location: PopularLocation | PlaceDetails) => void;
   selectedLocationId?: string;
-  filterCategory?: LocationCategory;
+  filterCategory?: LocationCategoryValue;
   enableGoogleSearch?: boolean; // NEW: Enable Google Places search
 }
 

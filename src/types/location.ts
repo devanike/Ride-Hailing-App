@@ -1,7 +1,3 @@
-/**
- * Location-related type definitions
- */
-
 export interface Coordinates {
   latitude: number;
   longitude: number;
@@ -21,11 +17,14 @@ export interface LocationError {
   message: string;
 }
 
-export enum LocationPermissionStatus {
-  GRANTED = 'granted',
-  DENIED = 'denied',
-  UNDETERMINED = 'undetermined',
-}
+export const LocationPermissionStatus = {
+  GRANTED: "granted",
+  DENIED: "denied",
+  UNDETERMINED: "undetermined",
+} as const;
+
+export type LocationPermissionStatusValue =
+  (typeof LocationPermissionStatus)[keyof typeof LocationPermissionStatus];
 
 export interface LocationSubscription {
   remove: () => void;
