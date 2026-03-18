@@ -43,12 +43,12 @@ const ACTIVE_RIDE_STATUSES: RideStatus[] = [
 const STATUS_LABELS: Record<RideStatus, string> = {
   pending: "Looking for a driver...",
   accepted: "Driver is on the way",
+  arrived: "Driver has arrived",
   in_progress: "Ride in progress",
   completed: "Completed",
   cancelled: "Cancelled",
 };
 
-// NOTE: TypeScript will show an error on active-ride until (passenger)/active-ride.tsx is created.
 const RIDE_SCREEN: Partial<Record<RideStatus, string>> = {
   pending: "/(passenger)/driver-offers",
   accepted: "/(passenger)/active-ride",

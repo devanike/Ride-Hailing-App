@@ -1,15 +1,5 @@
-import { StyleSheet, Text } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Redirect } from "expo-router";
 
-export default function AdminDashboard() {
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.text}>Admin Dashboard</Text>
-    </SafeAreaView>
-  );
+export default function AdminIndex() {
+  return <Redirect href="/(admin)/reports" />;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  text: { fontSize: 20, fontWeight: "bold" },
-});
