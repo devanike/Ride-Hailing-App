@@ -4,6 +4,7 @@ import { PaymentMethod, PaymentStatus } from "./payment";
 export type RideStatus =
   | "pending"
   | "accepted"
+  | "arrived"
   | "in_progress"
   | "completed"
   | "cancelled";
@@ -33,7 +34,9 @@ export interface Ride {
     latitude: number;
     longitude: number;
   };
+  proposedFare: number;
   agreedFare: number | null;
+  declinedBy: string[];
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus;
   paymentReference: string | null;
