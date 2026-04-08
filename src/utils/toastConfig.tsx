@@ -1,31 +1,36 @@
-import { BORDER_RADIUS, COLORS_LIGHT, SHADOWS, SPACING, TYPOGRAPHY } from '@/styles/theme';
-import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react-native';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { BaseToast, ErrorToast, InfoToast } from 'react-native-toast-message';
+import {
+  BORDER_RADIUS,
+  COLORS,
+  SHADOWS,
+  SPACING,
+  TYPOGRAPHY,
+} from "@/styles/theme";
+import { AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react-native";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { BaseToast, ErrorToast, InfoToast } from "react-native-toast-message";
 
-const colors = COLORS_LIGHT;
+const colors = COLORS;
 
 export const toastConfig = {
-
   success: (props: any) => (
     <BaseToast
       {...props}
       style={[
         styles.baseToast,
         {
-          borderLeftColor: colors.status.success,
-          backgroundColor: colors.surface.light,
+          borderLeftColor: colors.success,
+          backgroundColor: colors.surface,
         },
       ]}
       contentContainerStyle={styles.contentContainer}
-      text1Style={[styles.text1, { color: colors.text.primary }]}
-      text2Style={[styles.text2, { color: colors.text.secondary }]}
+      text1Style={[styles.text1, { color: colors.textPrimary }]}
+      text2Style={[styles.text2, { color: colors.textSecondary }]}
       text1NumberOfLines={2}
       text2NumberOfLines={2}
       renderLeadingIcon={() => (
         <View style={styles.iconContainer}>
-          <CheckCircle size={24} color={colors.status.success} />
+          <CheckCircle size={24} color={colors.success} />
         </View>
       )}
     />
@@ -37,18 +42,18 @@ export const toastConfig = {
       style={[
         styles.baseToast,
         {
-          borderLeftColor: colors.status.error,
-          backgroundColor: colors.surface.light,
+          borderLeftColor: colors.error,
+          backgroundColor: colors.surface,
         },
       ]}
       contentContainerStyle={styles.contentContainer}
-      text1Style={[styles.text1, { color: colors.text.primary }]}
-      text2Style={[styles.text2, { color: colors.text.secondary }]}
+      text1Style={[styles.text1, { color: colors.textPrimary }]}
+      text2Style={[styles.text2, { color: colors.textSecondary }]}
       text1NumberOfLines={2}
       text2NumberOfLines={2}
       renderLeadingIcon={() => (
         <View style={styles.iconContainer}>
-          <XCircle size={24} color={colors.status.error} />
+          <XCircle size={24} color={colors.error} />
         </View>
       )}
     />
@@ -60,18 +65,18 @@ export const toastConfig = {
       style={[
         styles.baseToast,
         {
-          borderLeftColor: colors.status.info,
-          backgroundColor: colors.surface.light,
+          borderLeftColor: colors.info,
+          backgroundColor: colors.surface,
         },
       ]}
       contentContainerStyle={styles.contentContainer}
-      text1Style={[styles.text1, { color: colors.text.primary }]}
-      text2Style={[styles.text2, { color: colors.text.secondary }]}
+      text1Style={[styles.text1, { color: colors.textPrimary }]}
+      text2Style={[styles.text2, { color: colors.textSecondary }]}
       text1NumberOfLines={2}
       text2NumberOfLines={2}
       renderLeadingIcon={() => (
         <View style={styles.iconContainer}>
-          <Info size={24} color={colors.status.info} />
+          <Info size={24} color={colors.info} />
         </View>
       )}
     />
@@ -83,18 +88,18 @@ export const toastConfig = {
       style={[
         styles.baseToast,
         {
-          borderLeftColor: colors.status.warning,
-          backgroundColor: colors.surface.light,
+          borderLeftColor: colors.warning,
+          backgroundColor: colors.surface,
         },
       ]}
       contentContainerStyle={styles.contentContainer}
-      text1Style={[styles.text1, { color: colors.text.primary }]}
-      text2Style={[styles.text2, { color: colors.text.secondary }]}
+      text1Style={[styles.text1, { color: colors.textPrimary }]}
+      text2Style={[styles.text2, { color: colors.textSecondary }]}
       text1NumberOfLines={2}
       text2NumberOfLines={2}
       renderLeadingIcon={() => (
         <View style={styles.iconContainer}>
-          <AlertTriangle size={24} color={colors.status.warning} />
+          <AlertTriangle size={24} color={colors.warning} />
         </View>
       )}
     />
@@ -111,16 +116,16 @@ const styles = StyleSheet.create({
     ...SHADOWS.medium,
   },
   contentContainer: {
-    paddingHorizontal: SPACING.base,
+    paddingHorizontal: SPACING.md, // Changed from base to md
   },
   iconContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingLeft: SPACING.md,
   },
   text1: {
     fontSize: TYPOGRAPHY.sizes.base,
-    fontWeight: '600',
+    fontWeight: "600", // Note: React Native needs this as a string
     fontFamily: TYPOGRAPHY.fonts.bodyMedium,
   },
   text2: {

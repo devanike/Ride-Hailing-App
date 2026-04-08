@@ -1,63 +1,60 @@
-/**
- * useLocation Hook
- * React hook for accessing location services
- */
-
 import {
   getCurrentLocation,
   hasLocationPermission,
   isLocationEnabled,
   requestLocationPermission,
   watchLocation,
-} from '@/services/locationService';
-import { Location, LocationPermissionStatus, LocationSubscription } from '@/types/location';
-import { useCallback, useEffect, useRef, useState } from 'react';
+} from "@/services/locationService";
+import {
+  Location,
+  LocationPermissionStatus,
+  LocationPermissionStatusValue,
+} from "@/types/location";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseLocationReturn {
   location: Location | null;
   loading: boolean;
   error: string | null;
   hasPermission: boolean;
-  permissionStatus: LocationPermissionStatus | null;
+  permissionStatus: LocationPermissionStatusValue | null;
   requestPermission: () => Promise<void>;
   refreshLocation: () => Promise<void>;
   startWatching: () => Promise<void>;
   stopWatching: () => void;
 }
 
-/**
- * Hook for managing location state and permissions
- * @param watchPosition - Whether to continuously watch position updates
- * @returns Location state and control functions
- */
-export const useLocation = (watchPosition: boolean = false): UseLocationReturn => {
+export const useLocation = (
+  watchPosition: boolean = false,
+): UseLocationReturn => {
   const [location, setLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
-  const [permissionStatus, setPermissionStatus] = useState<LocationPermissionStatus | null>(null);
-  
-  const subscriptionRef = useRef<LocationSubscription | null>(null);
 
-  /**
-   * Check permission status
-   */
+  // Using the exact type you defined in types/location.ts
+  const [permissionStatus, setPermissionStatus] =
+    useState<LocationPermissionStatusValue | null>(null);
+
+  // watchLocation returns () => void, so we type the ref to match
+  const subscriptionRef = useRef<(() => void) | null>(null);
+
   const checkPermission = useCallback(async () => {
     try {
+      // hasLocationPermission returns a boolean
       const permitted = await hasLocationPermission();
       setHasPermission(permitted);
       setPermissionStatus(
-        permitted ? LocationPermissionStatus.GRANTED : LocationPermissionStatus.DENIED
+        permitted
+          ? LocationPermissionStatus.GRANTED
+          : LocationPermissionStatus.DENIED,
       );
     } catch (err) {
-      console.error('Error checking permission:', err);
+      console.error("Error checking permission:", err);
       setHasPermission(false);
     }
   }, []);
 
-  /**
-   * Get current location (one-time)
-   */
   const refreshLocation = useCallback(async () => {
     try {
       setLoading(true);
@@ -65,87 +62,93 @@ export const useLocation = (watchPosition: boolean = false): UseLocationReturn =
 
       const enabled = await isLocationEnabled();
       if (!enabled) {
-        setError('Location services are disabled');
+        setError("Location services are disabled");
         return;
       }
 
-      const currentLocation = await getCurrentLocation();
-      setLocation(currentLocation);
+      // getCurrentLocation returns basic Coordinates
+      const coords = await getCurrentLocation();
+
+      // Safely map Coordinates to your Location interface
+      setLocation({
+        ...coords,
+        accuracy: null,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+        timestamp: Date.now(),
+      });
     } catch (err) {
-      console.error('Error getting location:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get location');
+      console.error("Error getting location:", err);
+      setError(err instanceof Error ? err.message : "Failed to get location");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  /**
-   * Request location permission
-   */
   const requestPermission = useCallback(async () => {
     try {
       setLoading(true);
-      const status = await requestLocationPermission();
-      setPermissionStatus(status);
-      setHasPermission(status === LocationPermissionStatus.GRANTED);
-      
-      if (status === LocationPermissionStatus.GRANTED) {
+      // requestLocationPermission returns a boolean
+      const isGranted = await requestLocationPermission();
+
+      setPermissionStatus(
+        isGranted
+          ? LocationPermissionStatus.GRANTED
+          : LocationPermissionStatus.DENIED,
+      );
+      setHasPermission(isGranted);
+
+      if (isGranted) {
         await refreshLocation();
       }
     } catch (err) {
-      console.error('Error requesting permission:', err);
-      setError(err instanceof Error ? err.message : 'Failed to request permission');
+      console.error("Error requesting permission:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to request permission",
+      );
     } finally {
       setLoading(false);
     }
   }, [refreshLocation]);
 
-  /**
-   * Start watching location updates
-   */
   const startWatching = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
+      // Clean up existing subscription if it exists
       if (subscriptionRef.current) {
-        subscriptionRef.current.remove();
+        subscriptionRef.current();
       }
 
-      const newSubscription = await watchLocation((newLocation) => {
+      // watchLocation returns an unsubscribe function
+      const unsubscribe = watchLocation((newLocation) => {
         setLocation(newLocation);
         setError(null);
       });
 
-      subscriptionRef.current = newSubscription;
+      subscriptionRef.current = unsubscribe;
     } catch (err) {
-      console.error('Error watching location:', err);
-      setError(err instanceof Error ? err.message : 'Failed to watch location');
+      console.error("Error watching location:", err);
+      setError(err instanceof Error ? err.message : "Failed to watch location");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  /**
-   * Stop watching location updates
-   */
   const stopWatching = useCallback(() => {
     if (subscriptionRef.current) {
-      subscriptionRef.current.remove();
+      subscriptionRef.current(); // Execute the unsubscribe function
       subscriptionRef.current = null;
     }
   }, []);
 
-  /**
-   * Initialize on mount
-   */
   useEffect(() => {
     checkPermission();
   }, [checkPermission]);
 
-  /**
-   * Auto-watch if enabled
-   */
   useEffect(() => {
     if (watchPosition && hasPermission) {
       startWatching();
@@ -153,7 +156,7 @@ export const useLocation = (watchPosition: boolean = false): UseLocationReturn =
 
     return () => {
       if (subscriptionRef.current) {
-        subscriptionRef.current.remove();
+        subscriptionRef.current();
         subscriptionRef.current = null;
       }
     };

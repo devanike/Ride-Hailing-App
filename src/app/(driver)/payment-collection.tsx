@@ -87,10 +87,10 @@ export default function PaymentCollectionScreen(): React.JSX.Element {
               await recordDriverEarning(
                 rideId,
                 uid,
-                ride.passengerId,
+                // ride.passengerId,
                 ride.agreedFare ?? 0,
                 "cash",
-                null,
+                // null,
               );
               showSuccess("Payment Recorded", "Cash payment confirmed");
               navigateHome();
@@ -135,10 +135,10 @@ export default function PaymentCollectionScreen(): React.JSX.Element {
           await recordDriverEarning(
             rideId!,
             uid,
-            ride.passengerId,
+            // ride.passengerId,
             fare,
             "card",
-            ref,
+            // ref,
           );
           showSuccess("Payment Received", "Card payment successful");
           navigateHome();
