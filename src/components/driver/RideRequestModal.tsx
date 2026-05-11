@@ -1,8 +1,15 @@
 import { Button } from "@/components/common/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Ride } from "@/types/ride";
+import { VALIDATION } from "@/utils/constants";
 import { Flag, MapPin } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -81,12 +88,23 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
     onAccept(ride.proposedFare);
   }, [ride.proposedFare, onAccept]);
 
+  const parsedBid = useMemo(() => parseFloat(bidAmount), [bidAmount]);
+  const bidError = useMemo<string | null>(() => {
+    if (bidAmount.trim() === "") return null;
+    if (isNaN(parsedBid) || parsedBid < VALIDATION.minFare) {
+      return `Minimum bid is NGN ${VALIDATION.minFare.toLocaleString()}`;
+    }
+    if (parsedBid > VALIDATION.maxFare) {
+      return `Maximum bid is NGN ${VALIDATION.maxFare.toLocaleString()}`;
+    }
+    return null;
+  }, [bidAmount, parsedBid]);
+
   const handleBid = useCallback(() => {
-    const amount = parseFloat(bidAmount);
-    if (!amount || isNaN(amount) || amount <= 0) return;
+    if (bidError !== null || isNaN(parsedBid) || parsedBid <= 0) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
-    onBid(amount);
-  }, [bidAmount, onBid]);
+    onBid(parsedBid);
+  }, [bidError, parsedBid, onBid]);
 
   const handleDecline = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -170,6 +188,30 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       fontFamily: typography.fonts.heading,
       color: colors.textPrimary,
     },
+    vehicleTypeRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    vehicleTypeLabel: {
+      fontSize: typography.sizes.md,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textSecondary,
+    },
+    vehicleTypeBadge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      borderRadius: 4,
+      backgroundColor: colors.primary + "14",
+    },
+    vehicleTypeBadgeText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.primary,
+    },
     bidSection: {
       marginTop: spacing.md,
       marginBottom: spacing.md,
@@ -183,7 +225,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
     bidInput: {
       height: 48,
       borderWidth: 1.5,
-      borderColor: colors.border,
+      borderColor: bidError ? colors.error : colors.border,
       borderRadius: borderRadius.md,
       paddingHorizontal: spacing.md,
       fontSize: typography.sizes.base,
@@ -193,6 +235,12 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
     },
     bidInputFocused: {
       borderColor: colors.primary,
+    },
+    bidErrorText: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.error,
+      marginTop: spacing.xs,
     },
     buttons: {
       gap: spacing.sm,
@@ -270,6 +318,22 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
               </Text>
             </View>
 
+            {/* Required vehicle type */}
+            {ride.requiredVehicleType && (
+              <View style={styles.vehicleTypeRow}>
+                <Text style={styles.vehicleTypeLabel}>Vehicle required</Text>
+                <View style={styles.vehicleTypeBadge}>
+                  <Text style={styles.vehicleTypeBadgeText}>
+                    {ride.requiredVehicleType === "car"
+                      ? "Car"
+                      : ride.requiredVehicleType === "tricycle"
+                        ? "Tricycle"
+                        : "Bus"}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Bid input */}
             <View style={styles.bidSection}>
               <Text style={styles.bidLabel}>Your bid (NGN)</Text>
@@ -281,6 +345,9 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
                 returnKeyType="done"
                 onSubmitEditing={Keyboard.dismiss}
               />
+              {bidError !== null && (
+                <Text style={styles.bidErrorText}>{bidError}</Text>
+              )}
             </View>
 
             {/* Action buttons */}
@@ -296,6 +363,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
                 onPress={handleBid}
                 variant="outline"
                 fullWidth
+                disabled={bidError !== null || bidAmount.trim() === ""}
               />
               <TouchableWithoutFeedback onPress={handleDecline}>
                 <View style={styles.outlineDanger}>

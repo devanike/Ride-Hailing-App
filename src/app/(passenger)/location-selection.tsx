@@ -11,9 +11,11 @@ import { useCampusBoundary } from "@/hooks/useCampusBoundary";
 import { useLocation } from "@/hooks/useLocation";
 import { useTheme } from "@/hooks/useTheme";
 import { getAddressFromCoordinates } from "@/services/locationService";
+import { VehicleType } from "@/types/driver";
 import { LocationCategoryValue, PopularLocation } from "@/types/locations";
 import { Coordinates } from "@/types/map";
 import { PlaceDetails } from "@/types/places";
+import { VALIDATION } from "@/utils/constants";
 import { showError } from "@/utils/toast";
 import { router } from "expo-router";
 import { ArrowLeft, ArrowUpDown } from "lucide-react-native";
@@ -57,6 +59,8 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     LocationCategoryValue | "all"
   >("all");
   const [proposedFare, setProposedFare] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] =
+    useState<VehicleType | null>(null);
   const [outsideModal, setOutsideModal] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
 
@@ -140,11 +144,21 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     setDestination(pickup);
   }, [pickup, destination]);
 
+  const fareValue = parseFloat(proposedFare);
+  const fareError: string | null =
+    proposedFare.trim() === ""
+      ? null
+      : isNaN(fareValue) || fareValue < VALIDATION.minFare
+        ? `Minimum fare is NGN ${VALIDATION.minFare.toLocaleString()}`
+        : fareValue > VALIDATION.maxFare
+          ? `Maximum fare is NGN ${VALIDATION.maxFare.toLocaleString()}`
+          : null;
+
   const canConfirm =
     pickup !== null &&
     destination !== null &&
     proposedFare.trim() !== "" &&
-    parseFloat(proposedFare) > 0;
+    fareError === null;
 
   const handleConfirm = useCallback((): void => {
     if (!pickup || !destination) {
@@ -152,8 +166,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       return;
     }
 
-    const fareValue = parseFloat(proposedFare);
-    if (isNaN(fareValue) || fareValue <= 0) {
+    const value = parseFloat(proposedFare);
+    if (
+      isNaN(value) ||
+      value < VALIDATION.minFare ||
+      value > VALIDATION.maxFare
+    ) {
       showError("Invalid Fare", "Please enter a valid fare amount");
       return;
     }
@@ -167,10 +185,11 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         destinationAddress: destination.address,
         destinationLat: destination.coordinate.latitude.toString(),
         destinationLng: destination.coordinate.longitude.toString(),
-        proposedFare: fareValue.toString(),
+        proposedFare: value.toString(),
+        vehicleType: selectedVehicleType ?? "",
       },
     });
-  }, [pickup, destination, proposedFare]);
+  }, [pickup, destination, proposedFare, selectedVehicleType]);
 
   const mapMarkers = useMemo(() => {
     const markers = [];
@@ -307,6 +326,41 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     popularSection: {
       marginTop: spacing.md,
     },
+    vehicleSection: {
+      marginHorizontal: spacing.screenPadding,
+      marginTop: spacing.md,
+    },
+    vehicleSectionLabel: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    vehicleRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    vehicleOption: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      borderRadius: borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: colors.surface,
+    },
+    vehicleOptionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "14",
+    },
+    vehicleOptionText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textSecondary,
+    },
+    vehicleOptionTextActive: {
+      color: colors.primary,
+    },
     sectionLabel: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
@@ -332,7 +386,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       backgroundColor: colors.surface,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: fareError ? colors.error : colors.border,
       paddingHorizontal: spacing.md,
       height: 52,
     },
@@ -352,6 +406,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textMuted,
+      marginTop: spacing.xs,
+    },
+    fareError: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.error,
       marginTop: spacing.xs,
     },
     confirmSection: {
@@ -439,6 +499,43 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           />
         </View>
 
+        {/* Vehicle Type */}
+        <View style={styles.vehicleSection}>
+          <Text style={styles.vehicleSectionLabel}>
+            Vehicle type (optional)
+          </Text>
+          <View style={styles.vehicleRow}>
+            {(["car", "tricycle", "bus"] as VehicleType[]).map((type) => {
+              const labels: Record<VehicleType, string> = {
+                car: "Car",
+                tricycle: "Tricycle",
+                bus: "Bus",
+              };
+              const active = selectedVehicleType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.vehicleOption,
+                    active && styles.vehicleOptionActive,
+                  ]}
+                  onPress={() => setSelectedVehicleType(active ? null : type)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.vehicleOptionText,
+                      active && styles.vehicleOptionTextActive,
+                    ]}
+                  >
+                    {labels[type]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Popular Locations */}
         <View style={styles.popularSection}>
           <LocationCategoryFilter
@@ -482,6 +579,9 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           <Text style={styles.fareHint}>
             Drivers will see this and can counter-offer
           </Text>
+          {fareError !== null && (
+            <Text style={styles.fareError}>{fareError}</Text>
+          )}
         </View>
 
         {/* Confirm */}

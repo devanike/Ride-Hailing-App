@@ -6,7 +6,7 @@ import { PickupMarker } from "@/components/map/PickupMarker";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { Collections, SubCollections } from "@/types/database";
-import { Driver } from "@/types/driver";
+import { Driver, VehicleType } from "@/types/driver";
 import { Bid } from "@/types/ride";
 import { showError } from "@/utils/toast";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
@@ -73,6 +73,7 @@ export default function DriverOffersScreen(): React.JSX.Element {
     destinationLat,
     destinationLng,
     proposedFare,
+    vehicleType,
   } = useLocalSearchParams<{
     pickupAddress: string;
     pickupLat: string;
@@ -81,6 +82,7 @@ export default function DriverOffersScreen(): React.JSX.Element {
     destinationLat: string;
     destinationLng: string;
     proposedFare: string;
+    vehicleType: string;
   }>();
 
   const pickup = useMemo(
@@ -117,6 +119,7 @@ export default function DriverOffersScreen(): React.JSX.Element {
     destinationLat: parseFloat(destinationLat ?? "7.4453"),
     destinationLng: parseFloat(destinationLng ?? "3.8993"),
     proposedFare: parseFloat(proposedFare ?? "0"),
+    requiredVehicleType: (vehicleType as VehicleType) || null,
   });
 
   // Create ride request once on mount
@@ -151,6 +154,7 @@ export default function DriverOffersScreen(): React.JSX.Element {
           },
           agreedFare: null,
           proposedFare: p.proposedFare,
+          requiredVehicleType: p.requiredVehicleType,
           paymentMethod: null,
           paymentStatus: "pending",
           paymentReference: null,

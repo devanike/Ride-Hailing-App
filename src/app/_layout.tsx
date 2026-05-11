@@ -20,7 +20,6 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 import Toast from "react-native-toast-message";
 
-// Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 type AuthState =
@@ -29,14 +28,10 @@ type AuthState =
   | "no-pin"
   | "new-device"
   | "needs-pin"
-  | "driver-incomplete"
   | "authenticated";
 
 type UserType = "passenger" | "driver" | "admin";
 
-/**
- * Inner layout component that uses auth context
- */
 function RootLayoutInner() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -46,30 +41,27 @@ function RootLayoutInner() {
   const [userType, setUserType] = useState<UserType>("passenger");
 
   /**
-   * Load user type and check driver registration status
+   * Resolve user type by checking role collections in order:
+   * admins -> drivers -> passengers
    */
   const loadUserTypeAndComplete = useCallback(async (uid: string) => {
     try {
-      const userDoc = await getDoc(doc(db, "users", uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const type = userData.userType || "passenger";
-        setUserType(type);
+      const [adminSnap, driverSnap, passengerSnap] = await Promise.all([
+        getDoc(doc(db, "admins", uid)),
+        getDoc(doc(db, "drivers", uid)),
+        getDoc(doc(db, "passengers", uid)),
+      ]);
 
-        // If driver, check registration status
-        if (type === "driver") {
-          const driverDoc = await getDoc(doc(db, "drivers", uid));
-          if (driverDoc.exists()) {
-            const driverData = driverDoc.data();
-
-            // Check if driver registration is incomplete
-            if (driverData.status === "incomplete") {
-              setAuthState("driver-incomplete");
-              return;
-            }
-          }
-        }
+      if (adminSnap.exists()) {
+        setUserType("admin");
+      } else if (driverSnap.exists()) {
+        setUserType("driver");
+      } else if (passengerSnap.exists()) {
+        setUserType("passenger");
+      } else {
+        setUserType("passenger");
       }
+
       setAuthState("authenticated");
     } catch (error) {
       console.error("Load user type error:", error);
@@ -78,9 +70,6 @@ function RootLayoutInner() {
     }
   }, []);
 
-  /**
-   * Handle Firebase auth state changes
-   */
   const handleAuthStateChange = useCallback(
     async (user: User | null) => {
       if (!user) {
@@ -89,21 +78,18 @@ function RootLayoutInner() {
       }
 
       try {
-        // Check if PIN exists
         const pinExists = await hasPIN();
         if (!pinExists) {
           setAuthState("no-pin");
           return;
         }
 
-        // Check if device is new
         const isNew = await isNewDevice();
         if (isNew) {
           setAuthState("new-device");
           return;
         }
 
-        // Try biometric authentication if available
         const biometric = await getBiometricCapability();
         const bioEnabled = await isBiometricEnabled();
 
@@ -115,7 +101,6 @@ function RootLayoutInner() {
           }
         }
 
-        // Require PIN authentication
         setAuthState("needs-pin");
       } catch (error) {
         console.error("Auth state check error:", error);
@@ -125,13 +110,11 @@ function RootLayoutInner() {
     [loadUserTypeAndComplete],
   );
 
-  // Listen to auth state changes AND auth refresh key
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
     return () => unsubscribe();
-  }, [handleAuthStateChange, authRefreshKey]); // Re-run when authRefreshKey changes
+  }, [handleAuthStateChange, authRefreshKey]);
 
-  // Hide splash screen once auth state is determined
   useEffect(() => {
     if (authState !== "loading") {
       SplashScreen.hideAsync().catch((err) =>
@@ -140,7 +123,6 @@ function RootLayoutInner() {
     }
   }, [authState]);
 
-  // Handle navigation based on auth state
   useEffect(() => {
     if (authState === "loading") return;
 
@@ -165,10 +147,6 @@ function RootLayoutInner() {
         }
         break;
 
-      case "driver-incomplete":
-        targetRoute = "/(driver)/driver-registration";
-        break;
-
       case "authenticated":
         if (inAuthGroup) {
           const routes: Record<UserType, string> = {
@@ -186,7 +164,6 @@ function RootLayoutInner() {
     }
   }, [authState, userType, segments, router]);
 
-  // Show loading screen while checking auth state
   if (authState === "loading") {
     return (
       <View
@@ -203,77 +180,45 @@ function RootLayoutInner() {
   return (
     <ThemeProvider value={DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
-        {/* Auth flow routes */}
         <Stack.Screen name="(auth)" />
-
-        {/* Main app routes */}
         <Stack.Screen name="(passenger)" />
         <Stack.Screen name="(driver)" />
         <Stack.Screen name="(admin)" />
-
-        {/* Shared modal screens */}
         <Stack.Screen
           name="location-selection"
-          options={{
-            presentation: "modal",
-            title: "Select Location",
-          }}
+          options={{ presentation: "modal", title: "Select Location" }}
         />
         <Stack.Screen
           name="report-incident"
-          options={{
-            presentation: "modal",
-            title: "Report Issue",
-          }}
+          options={{ presentation: "modal", title: "Report Issue" }}
         />
         <Stack.Screen
           name="rating"
-          options={{
-            presentation: "modal",
-            title: "Rate Your Ride",
-          }}
+          options={{ presentation: "modal", title: "Rate Your Ride" }}
         />
         <Stack.Screen
           name="ride-details"
-          options={{
-            presentation: "modal",
-            title: "Ride Details",
-          }}
+          options={{ presentation: "modal", title: "Ride Details" }}
         />
         <Stack.Screen
           name="my-reports"
-          options={{
-            presentation: "modal",
-            title: "My Reports",
-          }}
+          options={{ presentation: "modal", title: "My Reports" }}
         />
         <Stack.Screen
           name="report-details"
-          options={{
-            presentation: "modal",
-            title: "Report Details",
-          }}
+          options={{ presentation: "modal", title: "Report Details" }}
         />
         <Stack.Screen
           name="edit-profile"
-          options={{
-            presentation: "modal",
-            title: "Edit Profile",
-          }}
+          options={{ presentation: "modal", title: "Edit Profile" }}
         />
         <Stack.Screen
           name="security-settings"
-          options={{
-            presentation: "modal",
-            title: "Security Settings",
-          }}
+          options={{ presentation: "modal", title: "Security Settings" }}
         />
         <Stack.Screen
           name="help"
-          options={{
-            presentation: "modal",
-            title: "Help & Support",
-          }}
+          options={{ presentation: "modal", title: "Help & Support" }}
         />
       </Stack>
 
@@ -283,9 +228,6 @@ function RootLayoutInner() {
   );
 }
 
-/**
- * Root layout with AuthProvider
- */
 export default function RootLayout() {
   return (
     <AuthProvider>

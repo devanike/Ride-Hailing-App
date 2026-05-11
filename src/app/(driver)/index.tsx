@@ -54,10 +54,15 @@ export default function DriverHomeScreen(): React.JSX.Element {
   const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const rideUnsubRef = useRef<(() => void) | null>(null);
   const locationRef = useRef(location);
+  const driverRef = useRef(driver);
 
   useEffect(() => {
     locationRef.current = location;
   }, [location]);
+
+  useEffect(() => {
+    driverRef.current = driver;
+  }, [driver]);
 
   // Load driver document
   useEffect(() => {
@@ -172,6 +177,13 @@ export default function DriverHomeScreen(): React.JSX.Element {
 
         // Skip if ride already assigned
         if (ride.driverId) continue;
+
+        // Skip if ride requires a specific vehicle type this driver doesn't have
+        if (
+          ride.requiredVehicleType &&
+          driverRef.current?.vehicleType !== ride.requiredVehicleType
+        )
+          continue;
 
         const dist = calculateDistance(
           { latitude: loc.latitude, longitude: loc.longitude },

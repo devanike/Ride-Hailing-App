@@ -3,18 +3,17 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-native",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/components/*": ["src/components/*"],
-      "@/screens/*": ["src/screens/*"],
-      "@/navigation/*": ["src/navigation/*"],
-      "@/services/*": ["src/services/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/styles/*": ["src/styles/*"],
-      "@/types/*": ["src/types/*"],
-      "@/assets/*": ["src/assets/*"],
-      "@/hooks/*": ["src/hooks/*"],
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/screens/*": ["./src/screens/*"],
+      "@/navigation/*": ["./src/navigation/*"],
+      "@/services/*": ["./src/services/*"],
+      "@/utils/*": ["./src/utils/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/assets/*": ["./src/assets/*"],
+      "@/hooks/*": ["./src/hooks/*"],
       "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"],
       "firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
     }

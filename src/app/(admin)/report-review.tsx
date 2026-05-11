@@ -1,6 +1,11 @@
+import { ReportSummaryCard } from "@/components/cards/ReportSummaryCard";
 import { Button } from "@/components/common/Button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useTheme } from "@/hooks/useTheme";
+import {
+  generateReportSummary,
+  ReportSummaryResult,
+} from "@/services/aiService";
 import { db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
 import { Driver } from "@/types/driver";
@@ -184,6 +189,10 @@ export default function ReportReviewScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryResult, setSummaryResult] =
+    useState<ReportSummaryResult | null>(null);
+
   const [selectedStatus, setSelectedStatus] = useState<ReportStatus>("open");
   const [resolutionNote, setResolutionNote] = useState("");
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
@@ -243,6 +252,31 @@ export default function ReportReviewScreen(): React.JSX.Element {
 
     return unsub;
   }, [reportId]);
+
+  // Call AI summary once the report and both user profiles have loaded
+  useEffect(() => {
+    if (!report || loading) return;
+
+    setSummaryLoading(true);
+    setSummaryResult(null);
+
+    generateReportSummary({
+      category: report.category,
+      description: report.description,
+      reporterUserType: reporter?.userType ?? "passenger",
+      reportedUserType: reportedUser?.userType ?? null,
+      rideContext: ride
+        ? {
+            pickup: ride.pickupLocation.address,
+            dropoff: ride.dropoffLocation.address,
+            fare: ride.agreedFare ?? 0,
+          }
+        : null,
+    })
+      .then((result) => setSummaryResult(result))
+      .catch(() => setSummaryResult(null))
+      .finally(() => setSummaryLoading(false));
+  }, [report, loading, reporter, reportedUser, ride]);
 
   const handleSave = useCallback(async () => {
     if (!reportId || !report) return;
@@ -406,6 +440,8 @@ export default function ReportReviewScreen(): React.JSX.Element {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        <ReportSummaryCard loading={summaryLoading} result={summaryResult} />
+
         {/* Reporter */}
         {reporter && (
           <SectionCard>

@@ -13,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.yourcompany.uirideapp",
+    bundleIdentifier: "com.graceolabode.uirideapp",
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
         "UI-Ride needs your location to show nearby drivers and enable ride tracking.",
@@ -32,11 +32,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
+    package: "com.graceolabode.uirideapp",
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      foregroundImage: "./assets/images/icon.png",
     },
     permissions: [
       "ACCESS_COARSE_LOCATION",
@@ -50,7 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     config: {
       googleMaps: {
-        apiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
       },
     },
     edgeToEdgeEnabled: true,
@@ -58,14 +57,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   web: {
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./assets/images/icon.png",
   },
   plugins: [
     "expo-router",
+    "expo-web-browser",
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
+        image: "./assets/images/splash.png",
         imageWidth: 200,
         resizeMode: "contain",
         backgroundColor: "#ffffff",
@@ -95,5 +95,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+
+  extra: {
+    eas: {
+      projectId: "8cb5721f-8bf8-42ee-ab7d-3f3218186f23",
+    },
   },
 });

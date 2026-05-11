@@ -1,127 +1,87 @@
 # Admin Account Setup Guide
 
-## Option 1: Manual Creation in Firebase Console (Recommended)
-
-### Why Sign Up First?
-
-**You MUST sign up through the app first because:**
-1. Firebase Authentication requires phone verification (OTP)
-2. The app creates necessary security fields (PIN hash, device ID, etc.)
-3. Only Firebase Admin SDK can create users without OTP (not available in app)
-
-**The signup creates the account, then you manually UPGRADE it to admin.**
-
-### Step 1: Sign Up Through App (Creates Base Account)
-### Step 1: Sign Up Through App (Creates Base Account)
-1. Open the app
-2. Sign up as a **Passenger** (user type doesn't matter, you'll change it)
-3. Complete the entire signup flow:
-   - Enter name and phone number
-   - Verify OTP code
-   - Upload photo and email (optional)
-   - Create PIN
-   - Enable/skip fingerprint
-4. **Write down your phone number** (e.g., +2348012345678)
-
-### Step 2: Manually Upgrade to Admin in Firestore
-1. Go to Firebase Console → Firestore Database
-2. Find the `users` collection
-3. Find your user document by phone number
-4. Edit the document and update these fields:
-   ```
-   userType: "admin"
-   isAdmin: true
-   ```
-5. Save changes
-
-### Step 3: Login as Admin
-1. **Logout** from the app (if logged in)
-2. Close and reopen the app
-3. Login with your phone number and PIN
-4. App will detect `isAdmin: true` and route to admin dashboard
+Admins are created entirely by the developer. No signup through the app
+is required or permitted. Admin accounts are created manually in the
+Firebase Console.
 
 ---
 
-## Why This Process?
+## Step 1: Create the Firebase Auth Account
 
-**Security Reasons:**
-- Phone verification prevents fake accounts
-- PIN/biometric setup ensures secure access
-- No "admin signup" form = no security vulnerability
-- Manual upgrade = controlled admin access
+1. Go to the Firebase Console for your project.
+2. Navigate to **Authentication > Users**.
+3. Click **Add user**.
+4. Enter the admin's phone number in E.164 format (e.g. +2348012345678).
+   Leave the password field empty — phone auth does not use a password.
+5. Click **Add user**.
+6. Firebase will generate a UID for this account. Copy that UID.
 
-**Technical Reasons:**
-- Firebase Auth requires OTP for phone numbers
-- App creates security fields (PIN, device tracking)
-- Only Firebase Admin SDK can bypass OTP (server-side only)
+---
+
+## Step 2: Create the Admins Document in Firestore
+
+1. Go to **Firestore Database** in the Firebase Console.
+2. Open (or create) the `admins` collection.
+3. Click **Add document**.
+4. Set the **Document ID** to the UID copied in Step 1.
+5. Add the following fields:
+
+```
+uid:          string    <the UID from Step 1>
+name:         string    "Admin Name"
+phone:        string    "+2348012345678"
+email:        string    "admin@example.com"  (or null)
+profilePhoto: null
+createdAt:    timestamp (set to current time)
+updatedAt:    timestamp (set to current time)
+```
+
+6. Save the document.
+
+---
+
+## Step 3: Admin Logs In
+
+The admin opens the app and logs in with their phone number through the
+normal login flow. The app sends an OTP to the phone number, the admin
+verifies it, then sets up a PIN on first use.
+
+After PIN setup, the root layout checks the `admins` collection for the
+UID. When found, the app routes to `/(admin)`.
+
+---
+
+## How the App Routes Admins
+
+After authentication, the app checks Firestore collections in this order:
+
+1. `admins/{uid}` exists -> route to `/(admin)`
+2. `drivers/{uid}` exists -> route to `/(driver)`
+3. `passengers/{uid}` exists -> route to `/(passenger)`
+4. None found -> route to `/(auth)/profile-setup`
+
+The OTP verification screen also guards against accidentally creating a
+passenger or driver document for a UID that already exists in `admins`.
 
 ---
 
 ## Creating Multiple Admins
 
-Repeat Steps 2-4 for each admin account you want to create.
+Repeat Steps 1 and 2 for each admin account.
 
 ---
 
-## Admin Document Structure
+## Removing Admin Access
 
-Your admin user document should look like this:
-
-```javascript
-{
-  uid: "firebase_generated_uid",
-  name: "Admin Name",
-  phone: "+2348012345678",
-  email: "admin@uicampuscab.com",
-  userType: "admin",
-  profilePhoto: "cloudinary_url_or_null",
-  rating: 0,
-  totalRides: 0,
-  isAdmin: true,  // ← THIS IS THE KEY FIELD
-  
-  // Security fields
-  pinLastChanged: Timestamp,
-  biometricEnabled: false,
-  knownDevices: ["device_id"],
-  failedLoginAttempts: 0,
-  lockedUntil: null,
-  
-  createdAt: Timestamp,
-  updatedAt: Timestamp
-}
-```
+Delete the document at `admins/{uid}` in Firestore. The Firebase Auth
+account can also be removed from Authentication > Users if the person
+should no longer have any access.
 
 ---
 
 ## Security Notes
 
-1. **Never expose admin creation in the app** - admins should only be created manually
-2. **Limit admin accounts** - only create for trusted staff
-3. **Use strong PINs** - admins have elevated privileges
-4. **Monitor admin activity** - track what admins do in the system
-5. **Regular audits** - periodically review who has admin access
-
----
-
-## Testing Admin Access
-
-After setting up admin:
-1. Login with admin credentials
-2. You should see admin dashboard (not passenger/driver home)
-3. Verify admin features work (view all rides, manage users, etc.)
-
----
-
-## Troubleshooting
-
-**Q: I updated to admin but still see passenger screen?**
-- Logout and login again
-- Make sure `isAdmin: true` is saved in Firestore
-- Check that app checks `isAdmin` in auth flow
-
-**Q: Can I make existing driver an admin?**
-- Yes, just update their `userType` and `isAdmin` fields
-- They can still access driver features if needed
-
-**Q: How do I remove admin access?**
-- Update user document: `isAdmin: false, userType: "passenger"` or `"driver"`
+- Admin accounts are never created through the app signup flow.
+- There is no admin registration screen in the app.
+- Only developers with Firebase Console access can create or remove admins.
+- Limit admin accounts to trusted staff only.

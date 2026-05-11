@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase/firestore";
+import { VehicleType } from "./driver";
 import { PaymentMethod, PaymentStatus } from "./payment";
 
 export type RideStatus =
@@ -36,6 +37,7 @@ export interface Ride {
   };
   proposedFare: number;
   agreedFare: number | null;
+  requiredVehicleType: VehicleType | null;
   declinedBy: string[];
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus;

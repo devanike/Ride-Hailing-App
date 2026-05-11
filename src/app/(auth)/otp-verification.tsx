@@ -128,6 +128,15 @@ export default function OTPVerificationScreen() {
         return;
       }
 
+      // Guard: if this UID already exists in admins, do not create
+      // a passenger or driver document - route directly to admin home
+      const adminSnap = await getDoc(doc(db, "admins", uid));
+      if (adminSnap.exists()) {
+        showSuccess("Success", "Login successful");
+        router.replace("/(admin)");
+        return;
+      }
+
       // Signup: create initial document in correct collection
       if (userType === "driver") {
         await setDoc(doc(db, "drivers", uid), {
