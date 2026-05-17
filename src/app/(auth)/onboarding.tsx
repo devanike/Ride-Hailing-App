@@ -8,8 +8,8 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
   FlatList,
-  Image,
-  ImageSourcePropType,
+  // Image,
+  // ImageSourcePropType,
   StatusBar,
   StyleSheet,
   Text,
@@ -25,7 +25,7 @@ interface OnboardingSlide {
   id: string;
   title: string;
   description: string;
-  image: ImageSourcePropType;
+  // image: ImageSourcePropType;
 }
 
 interface ViewableItemsChanged {
@@ -38,14 +38,14 @@ const slides: readonly OnboardingSlide[] = [
     id: "1",
     title: "Find Your Ride",
     description: "Connect with verified drivers across UI campus in seconds",
-    image: require("../../../assets/illustrations/onboarding-1.png"),
+    // image: require("../../../assets/illustrations/onboarding-1.png"),
   },
   {
     id: "2",
     title: "Track in Real-Time",
     description:
       "Know exactly where your driver is and get accurate arrival times",
-    image: require("../../../assets/illustrations/onboarding-2.png"),
+    // image: require("../../../assets/illustrations/onboarding-2.png"),
   },
 ] as const;
 
@@ -155,7 +155,7 @@ export default function OnboardingScreen(): React.JSX.Element {
 
       return (
         <View style={styles.slide}>
-          <Image source={item.image} style={styles.illustration} />
+          {/* <Image source={item.image} style={styles.illustration} /> */}
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.description}>{item.description}</Text>
         </View>
