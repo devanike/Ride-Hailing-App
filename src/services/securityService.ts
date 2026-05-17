@@ -1,3 +1,4 @@
+import { Collections, UserSecurity } from "@/types/database";
 import {
   AuthenticationResult,
   BiometricCapability,
@@ -9,11 +10,13 @@ import Constants from "expo-constants";
 import * as Crypto from "expo-crypto";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Platform } from "react-native";
+import { auth, db } from "./firebaseConfig";
 
 // Security Service - Handles PIN and biometric authentication
 
-// Storage keys
+// Storage keys (local cache)
 const PIN_KEY = "user_pin_hash";
 const PIN_SALT_KEY = "user_pin_salt";
 const PIN_LAST_CHANGED_KEY = "pin_last_changed";
@@ -21,9 +24,11 @@ const BIOMETRIC_ENABLED_KEY = "biometric_enabled";
 const KNOWN_DEVICES_KEY = "known_devices";
 const FAILED_ATTEMPTS_KEY = "failed_attempts";
 const LOCKED_UNTIL_KEY = "locked_until";
+const DEVICE_ID_KEY = "device_unique_id";
+const ONBOARDING_KEY = "@onboarding_completed";
 
 const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const LOCKOUT_DURATION = 5 * 60 * 1000;
 
 const makeError = (message: string): Error => {
   const error = new Error(message);
@@ -68,11 +73,30 @@ export const setupPIN = async (pin: string): Promise<void> => {
     if (!/^\d{6}$/.test(pin)) {
       throw makeError("PIN must be exactly 6 digits");
     }
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw makeError("User not authenticated");
+
     const salt = await generateSalt();
     const hash = await hashPIN(pin, salt);
+    const now = new Date().toISOString();
+
+    // Store in Firestore (synced across devices)
+    await setDoc(
+      doc(db, Collections.USER_SECURITY, uid),
+      {
+        pinHash: hash,
+        pinSalt: salt,
+        pinLastChanged: now,
+        updatedAt: now,
+      } as UserSecurity,
+      { merge: true },
+    );
+
+    // Also cache locally for faster verification
     await SecureStore.setItemAsync(PIN_KEY, hash);
     await SecureStore.setItemAsync(PIN_SALT_KEY, salt);
-    await AsyncStorage.setItem(PIN_LAST_CHANGED_KEY, new Date().toISOString());
+    await AsyncStorage.setItem(PIN_LAST_CHANGED_KEY, now);
   } catch (error) {
     console.error("Error setting up PIN:", error);
     if (isSecurityError(error)) throw error;
@@ -82,14 +106,37 @@ export const setupPIN = async (pin: string): Promise<void> => {
 
 export const verifyPIN = async (pin: string): Promise<boolean> => {
   try {
-    if (!pin || typeof pin !== "string") {
-      return false;
+    if (!pin || typeof pin !== "string") return false;
+
+    // Try local cache first (faster)
+    let storedHash = await SecureStore.getItemAsync(PIN_KEY);
+    let salt = await SecureStore.getItemAsync(PIN_SALT_KEY);
+
+    // If not local, fetch from Firestore
+    if (!storedHash || !salt) {
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw makeError("User not authenticated");
+
+      const secDoc = await getDoc(doc(db, Collections.USER_SECURITY, uid));
+      if (!secDoc.exists()) {
+        throw makeError("PIN not found. Please setup your PIN.");
+      }
+
+      const data = secDoc.data() as UserSecurity;
+      storedHash = data.pinHash;
+      salt = data.pinSalt;
+
+      // Cache locally for next time
+      if (storedHash && salt) {
+        await SecureStore.setItemAsync(PIN_KEY, storedHash);
+        await SecureStore.setItemAsync(PIN_SALT_KEY, salt);
+      }
     }
-    const storedHash = await SecureStore.getItemAsync(PIN_KEY);
-    const salt = await SecureStore.getItemAsync(PIN_SALT_KEY);
+
     if (!storedHash || !salt) {
       throw makeError("PIN not found. Please setup your PIN.");
     }
+
     const hash = await hashPIN(pin, salt);
     return hash === storedHash;
   } catch (error) {
@@ -111,8 +158,8 @@ export const updatePIN = async (
     if (!isValid) {
       throw makeError("Current PIN is incorrect");
     }
+    // setupPIN handles both Firestore and local storage
     await setupPIN(newPin);
-    await AsyncStorage.setItem(PIN_LAST_CHANGED_KEY, new Date().toISOString());
   } catch (error) {
     console.error("Error updating PIN:", error);
     if (isSecurityError(error)) throw error;
@@ -122,9 +169,25 @@ export const updatePIN = async (
 
 export const deletePIN = async (): Promise<void> => {
   try {
+    // Clear local cache
     await SecureStore.deleteItemAsync(PIN_KEY);
     await SecureStore.deleteItemAsync(PIN_SALT_KEY);
     await AsyncStorage.removeItem(PIN_LAST_CHANGED_KEY);
+
+    // Clear from Firestore
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      await setDoc(
+        doc(db, Collections.USER_SECURITY, uid),
+        {
+          pinHash: null,
+          pinSalt: null,
+          pinLastChanged: null,
+          updatedAt: new Date().toISOString(),
+        } as UserSecurity,
+        { merge: true },
+      );
+    }
   } catch (error) {
     console.error("Error deleting PIN:", error);
     throw makeError("Failed to delete PIN. Please try again.");
@@ -133,8 +196,19 @@ export const deletePIN = async (): Promise<void> => {
 
 export const hasPIN = async (): Promise<boolean> => {
   try {
-    const pin = await SecureStore.getItemAsync(PIN_KEY);
-    return !!pin;
+    // Check local cache first
+    const localPin = await SecureStore.getItemAsync(PIN_KEY);
+    if (localPin) return true;
+
+    // Check Firestore
+    const uid = auth.currentUser?.uid;
+    if (!uid) return false;
+
+    const secDoc = await getDoc(doc(db, Collections.USER_SECURITY, uid));
+    if (!secDoc.exists()) return false;
+
+    const data = secDoc.data() as UserSecurity;
+    return !!data.pinHash;
   } catch (error) {
     console.error("Error checking PIN:", error);
     return false;
@@ -270,7 +344,16 @@ export const authenticateUser = async (
 
 // DEVICE MANAGEMENT
 export const getDeviceInfo = async (): Promise<DeviceInfo> => {
-  const deviceId = Constants.sessionId || "unknown";
+  let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+
+  if (!deviceId) {
+    const randomBytes = await Crypto.getRandomBytesAsync(16);
+    deviceId = Array.from(randomBytes, (byte: number) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+    await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+
   const deviceName =
     (Constants.deviceName as string | undefined) || "Unknown Device";
   const deviceType: "android" | "ios" =
@@ -397,6 +480,47 @@ export const getRemainingLockoutTime = async (): Promise<number> => {
   }
 };
 
+// ONBOARDING MANAGEMENT
+export const setHasSeenOnboarding = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+  } catch (error) {
+    console.error("Error setting onboarding status:", error);
+  }
+};
+
+export const checkOnboardingStatus = async (): Promise<boolean> => {
+  try {
+    const status = await AsyncStorage.getItem(ONBOARDING_KEY);
+    return status === "true";
+  } catch (error) {
+    console.error("Error checking onboarding status:", error);
+    return false;
+  }
+};
+
+// CLEAR ALL SECURITY DATA (for logout)
+export const clearAllSecurityData = async (): Promise<void> => {
+  try {
+    // Clear local PIN cache (NOT Firestore — PIN persists across devices)
+    await SecureStore.deleteItemAsync(PIN_KEY);
+    await SecureStore.deleteItemAsync(PIN_SALT_KEY);
+
+    // Clear other local security data
+    await AsyncStorage.removeItem(PIN_LAST_CHANGED_KEY);
+    await AsyncStorage.removeItem(BIOMETRIC_ENABLED_KEY);
+    await AsyncStorage.removeItem(KNOWN_DEVICES_KEY);
+    await AsyncStorage.removeItem(FAILED_ATTEMPTS_KEY);
+    await AsyncStorage.removeItem(LOCKED_UNTIL_KEY);
+
+    // Keep DEVICE_ID_KEY — device-level, not user-level
+    // Keep ONBOARDING_KEY — user already saw onboarding
+  } catch (error) {
+    console.error("Error clearing security data:", error);
+    throw error;
+  }
+};
+
 export default {
   setupPIN,
   verifyPIN,
@@ -417,4 +541,7 @@ export default {
   lockAccount,
   isAccountLocked,
   getRemainingLockoutTime,
+  setHasSeenOnboarding,
+  checkOnboardingStatus,
+  clearAllSecurityData,
 };

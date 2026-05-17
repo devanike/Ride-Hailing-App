@@ -1,11 +1,19 @@
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useTheme } from "@/hooks/useTheme";
-import { auth } from "@/services/firebaseConfig";
-import { getMyReports } from "@/services/reportService";
+import { auth, db } from "@/services/firebaseConfig";
+// import { getMyReports } from "@/services/reportService";
+import { Collections } from "@/types/database";
 import { Report, ReportCategory, ReportStatus } from "@/types/report";
 import { router } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import { ArrowLeft, FileText } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -164,24 +172,30 @@ export default function MyReportsScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<FilterValue>("all");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setLoading(false);
         return;
       }
-      try {
-        const data = await getMyReports(user.uid);
-        data.sort(
-          (a, b) =>
-            (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0),
-        );
+
+      const q = query(
+        collection(db, Collections.REPORTS),
+        where("reporterId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+      );
+
+      const unsubReports = onSnapshot(q, (snap) => {
+        const data = snap.docs.map((d) => ({
+          reportId: d.id,
+          ...d.data(),
+        })) as Report[];
         setReports(data);
-      } catch {
-        // silent — empty list shown
-      } finally {
         setLoading(false);
-      }
+      });
+
+      return () => unsubReports();
     });
+
     return unsub;
   }, []);
 

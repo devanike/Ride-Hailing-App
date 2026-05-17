@@ -8,6 +8,8 @@ import { router } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -24,6 +26,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+interface RideWithName extends Ride {
+  passengerName: string;
+}
 
 function PaymentBadge({ method }: { method: string | null | undefined }) {
   const { colors, typography, spacing, borderRadius } = useTheme();
@@ -56,11 +62,36 @@ function PaymentBadge({ method }: { method: string | null | undefined }) {
   );
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const { colors, typography, spacing, borderRadius } = useTheme();
+  if (status !== "cancelled") return null;
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        backgroundColor: colors.errorBackground ?? colors.error + "15",
+        borderRadius: borderRadius.sm,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: typography.sizes.xs,
+          fontFamily: typography.fonts.bodyMedium,
+          color: colors.error,
+        }}
+      >
+        Cancelled
+      </Text>
+    </View>
+  );
+}
+
 function RideCard({
   ride,
   onPress,
 }: {
-  ride: Ride & { passengerName?: string };
+  ride: RideWithName;
   onPress: () => void;
 }) {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
@@ -88,7 +119,6 @@ function RideCard({
         ...shadows.medium,
       }}
     >
-      {/* Date/time row */}
       <View
         style={{
           flexDirection: "row",
@@ -112,11 +142,10 @@ function RideCard({
             color: colors.primary,
           }}
         >
-          NGN {ride.agreedFare?.toLocaleString() ?? "—"}
+          ₦{ride.agreedFare?.toLocaleString() ?? "—"}
         </Text>
       </View>
 
-      {/* Passenger name */}
       <Text
         style={{
           fontSize: typography.sizes.sm,
@@ -125,10 +154,9 @@ function RideCard({
           marginBottom: spacing.sm,
         }}
       >
-        {ride.passengerName ?? "Passenger"}
+        {ride.passengerName}
       </Text>
 
-      {/* Pickup */}
       <View
         style={{
           flexDirection: "row",
@@ -151,7 +179,6 @@ function RideCard({
         </Text>
       </View>
 
-      {/* Dropoff */}
       <View
         style={{
           flexDirection: "row",
@@ -174,7 +201,20 @@ function RideCard({
         </Text>
       </View>
 
-      <PaymentBadge method={ride.paymentMethod} />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: spacing.sm,
+        }}
+      >
+        {ride.status === "cancelled" ? (
+          <StatusBadge status={ride.status} />
+        ) : (
+          <PaymentBadge method={ride.paymentMethod} />
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -182,8 +222,11 @@ function RideCard({
 export default function DriverHistoryScreen(): React.JSX.Element {
   const { colors, spacing, typography } = useTheme();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [rides, setRides] = useState<Ride[]>([]);
+  const [rides, setRides] = useState<RideWithName[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Cache passenger names so we don't re-fetch
+  const passengerCache = React.useRef<Record<string, string>>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
@@ -203,12 +246,37 @@ export default function DriverHistoryScreen(): React.JSX.Element {
       orderBy("createdAt", "desc"),
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
+    const unsub = onSnapshot(q, async (snap) => {
+      const rawRides = snap.docs.map((d) => ({
         rideId: d.id,
         ...d.data(),
       })) as Ride[];
-      setRides(data);
+
+      // Fetch passenger names
+      const enriched: RideWithName[] = await Promise.all(
+        rawRides.map(async (ride) => {
+          const pid = ride.passengerId;
+
+          // Check cache first
+          if (passengerCache.current[pid]) {
+            return { ...ride, passengerName: passengerCache.current[pid] };
+          }
+
+          // Fetch from Firestore
+          try {
+            const pSnap = await getDoc(doc(db, Collections.PASSENGERS, pid));
+            const name = pSnap.exists()
+              ? (pSnap.data().name as string) || "Passenger"
+              : "Passenger";
+            passengerCache.current[pid] = name;
+            return { ...ride, passengerName: name };
+          } catch {
+            return { ...ride, passengerName: "Passenger" };
+          }
+        }),
+      );
+
+      setRides(enriched);
       setLoading(false);
     });
 

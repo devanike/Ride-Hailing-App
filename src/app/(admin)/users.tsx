@@ -43,18 +43,16 @@ interface UserRow {
   profilePhoto: string | null;
   status: string;
   userType: "passenger" | "driver";
-  collection: string;
+  collectionName: string;
 }
 
 function UserCard({
   user,
-  onSuspend,
-  onReactivate,
+  onToggleStatus,
   actionLoading,
 }: {
   user: UserRow;
-  onSuspend: (user: UserRow) => void;
-  onReactivate: (user: UserRow) => void;
+  onToggleStatus: (user: UserRow) => void;
   actionLoading: string | null;
 }) {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
@@ -80,7 +78,6 @@ function UserCard({
         ...shadows.small,
       }}
     >
-      {/* Avatar */}
       {user.profilePhoto ? (
         <Image
           source={{ uri: user.profilePhoto }}
@@ -109,7 +106,6 @@ function UserCard({
         </View>
       )}
 
-      {/* Info */}
       <View style={{ flex: 1 }}>
         <Text
           style={{
@@ -133,7 +129,6 @@ function UserCard({
           {user.phone}
         </Text>
         <View style={{ flexDirection: "row", gap: spacing.xs }}>
-          {/* Type badge */}
           <View
             style={{
               backgroundColor: typeBg,
@@ -152,7 +147,6 @@ function UserCard({
               {typeLabel}
             </Text>
           </View>
-          {/* Status badge */}
           <View
             style={{
               backgroundColor: isSuspended ? "#FEE2E2" : "#D1FAE5",
@@ -174,7 +168,6 @@ function UserCard({
         </View>
       </View>
 
-      {/* Action button */}
       <TouchableOpacity
         style={{
           paddingHorizontal: spacing.sm,
@@ -184,7 +177,7 @@ function UserCard({
           borderColor: isSuspended ? colors.primary : colors.error,
           opacity: isLoading ? 0.5 : 1,
         }}
-        onPress={() => (isSuspended ? onReactivate(user) : onSuspend(user))}
+        onPress={() => onToggleStatus(user)}
         disabled={isLoading}
         activeOpacity={0.7}
       >
@@ -212,7 +205,6 @@ export default function AdminUsersScreen(): React.JSX.Element {
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Real-time listeners for both collections
   useEffect(() => {
     let loadedCount = 0;
     const markLoaded = () => {
@@ -231,9 +223,9 @@ export default function AdminUsersScreen(): React.JSX.Element {
               name: data.name ?? "Unknown",
               phone: data.phone ?? "—",
               profilePhoto: data.profilePhoto ?? null,
-              status: (data as any).status ?? "active",
+              status: data.status ?? "active",
               userType: "passenger",
-              collection: Collections.PASSENGERS,
+              collectionName: Collections.PASSENGERS,
             };
           }),
         );
@@ -254,7 +246,7 @@ export default function AdminUsersScreen(): React.JSX.Element {
               profilePhoto: data.profilePhoto ?? null,
               status: data.status ?? "active",
               userType: "driver",
-              collection: Collections.DRIVERS,
+              collectionName: Collections.DRIVERS,
             };
           }),
         );
@@ -283,48 +275,48 @@ export default function AdminUsersScreen(): React.JSX.Element {
     );
   }, [allUsers, search]);
 
-  const handleSuspend = useCallback((user: UserRow) => {
-    Alert.alert(
-      `Suspend ${user.name}?`,
-      "They will not be able to use the app until reactivated.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Suspend",
-          style: "destructive",
-          onPress: async () => {
-            setActionLoading(user.uid);
-            try {
-              await updateDoc(doc(db, user.collection, user.uid), {
-                status: "suspended",
-                updatedAt: serverTimestamp(),
-              });
-              showSuccess("Suspended", `${user.name} has been suspended.`);
-            } catch (err) {
-              console.error("Error suspending user:", err);
-              showError("Error", "Could not suspend user.");
-            } finally {
-              setActionLoading(null);
-            }
-          },
-        },
-      ],
-    );
-  }, []);
+  const handleToggleStatus = useCallback((user: UserRow) => {
+    const isSuspended = user.status === "suspended";
 
-  const handleReactivate = useCallback(async (user: UserRow) => {
-    setActionLoading(user.uid);
-    try {
-      await updateDoc(doc(db, user.collection, user.uid), {
+    if (isSuspended) {
+      // Reactivate immediately
+      setActionLoading(user.uid);
+      updateDoc(doc(db, user.collectionName, user.uid), {
         status: "active",
         updatedAt: serverTimestamp(),
-      });
-      showSuccess("Reactivated", `${user.name} has been reactivated.`);
-    } catch (err) {
-      console.error("Error reactivating user:", err);
-      showError("Error", "Could not reactivate user.");
-    } finally {
-      setActionLoading(null);
+      })
+        .then(() =>
+          showSuccess("Reactivated", `${user.name} has been reactivated.`),
+        )
+        .catch(() => showError("Error", "Could not reactivate user."))
+        .finally(() => setActionLoading(null));
+    } else {
+      // Confirm before suspending
+      Alert.alert(
+        `Suspend ${user.name}?`,
+        "They will not be able to request rides or go online until reactivated.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Suspend",
+            style: "destructive",
+            onPress: async () => {
+              setActionLoading(user.uid);
+              try {
+                await updateDoc(doc(db, user.collectionName, user.uid), {
+                  status: "suspended",
+                  updatedAt: serverTimestamp(),
+                });
+                showSuccess("Suspended", `${user.name} has been suspended.`);
+              } catch {
+                showError("Error", "Could not suspend user.");
+              } finally {
+                setActionLoading(null);
+              }
+            },
+          },
+        ],
+      );
     }
   }, []);
 
@@ -438,8 +430,7 @@ export default function AdminUsersScreen(): React.JSX.Element {
           renderItem={({ item }) => (
             <UserCard
               user={item}
-              onSuspend={handleSuspend}
-              onReactivate={handleReactivate}
+              onToggleStatus={handleToggleStatus}
               actionLoading={actionLoading}
             />
           )}

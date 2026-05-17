@@ -1,5 +1,6 @@
 import { Button } from "@/components/common/Button";
 import { useTheme } from "@/hooks/useTheme";
+// import { VehicleType } from "@/types/driver";
 import { Ride } from "@/types/ride";
 import { VALIDATION } from "@/utils/constants";
 import { Flag, MapPin } from "lucide-react-native";
@@ -23,7 +24,7 @@ import {
   View,
 } from "react-native";
 
-const COUNTDOWN_SECONDS = 30;
+const COUNTDOWN_SECONDS = 60;
 
 interface RideRequestModalProps {
   ride: Ride;
@@ -45,7 +46,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
-  const [bidAmount, setBidAmount] = useState(String(ride.proposedFare ?? 0));
+  const [bidAmount, setBidAmount] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep latest callback and fare in refs so the interval never goes stale
@@ -63,7 +64,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
     if (!visible) return;
 
     setCountdown(COUNTDOWN_SECONDS);
-    setBidAmount(String(proposedFareRef.current ?? 0));
+    setBidAmount("");
 
     Vibration.vibrate([0, 400, 200, 400]);
 
@@ -188,6 +189,24 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       fontFamily: typography.fonts.heading,
       color: colors.textPrimary,
     },
+    passengerCountRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    passengerCountLabel: {
+      fontSize: typography.sizes.md,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textSecondary,
+    },
+    passengerCountValue: {
+      fontSize: typography.sizes.lg,
+      fontFamily: typography.fonts.heading,
+      color: colors.textPrimary,
+    },
     vehicleTypeRow: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -280,6 +299,14 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
               <Text style={styles.countdown}>{formatCountdown(countdown)}</Text>
             </View>
 
+            {/* Passenger count */}
+            <View style={styles.passengerCountRow}>
+              <Text style={styles.passengerCountLabel}>Passengers</Text>
+              <Text style={styles.passengerCountValue}>
+                {ride.passengerCount ?? 1}
+              </Text>
+            </View>
+
             {/* Pickup */}
             <View style={styles.infoRow}>
               <MapPin size={18} color={colors.primary} />
@@ -336,7 +363,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
 
             {/* Bid input */}
             <View style={styles.bidSection}>
-              <Text style={styles.bidLabel}>Your bid (NGN)</Text>
+              <Text style={styles.bidLabel}>Counter offer amount (NGN)</Text>
               <TextInput
                 style={styles.bidInput}
                 value={bidAmount}
@@ -344,6 +371,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
                 keyboardType="numeric"
                 returnKeyType="done"
                 onSubmitEditing={Keyboard.dismiss}
+                placeholder="Enter your price"
               />
               {bidError !== null && (
                 <Text style={styles.bidErrorText}>{bidError}</Text>

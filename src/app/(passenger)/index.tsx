@@ -5,19 +5,13 @@ import { useLocation } from "@/hooks/useLocation";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
+import { Passenger } from "@/types/passenger";
 import { Ride, RideStatus } from "@/types/ride";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { Href, router } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { Navigation } from "lucide-react-native";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StatusBar,
   StyleSheet,
@@ -49,24 +43,42 @@ const STATUS_LABELS: Record<RideStatus, string> = {
   cancelled: "Cancelled",
 };
 
-const RIDE_SCREEN: Partial<Record<RideStatus, string>> = {
-  pending: "/(passenger)/driver-offers",
-  accepted: "/(passenger)/active-ride",
-  in_progress: "/(passenger)/active-ride",
-};
-
 export default function PassengerHomeScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const { location, loading: locationLoading } = useLocation();
+  const {
+    location,
+    loading: locationLoading,
+    requestPermission,
+    hasPermission,
+  } = useLocation(true);
 
   const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser);
   const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([]);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
+  const [isSuspended, setIsSuspended] = useState(false);
 
-  const snapPoints = useMemo(() => ["22%", "40%"], []);
+  // Check suspension status
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const unsub = onSnapshot(doc(db, Collections.PASSENGERS, uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as Passenger;
+        setIsSuspended(data.status === "suspended");
+      }
+    });
+
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!hasPermission) {
+      requestPermission();
+    }
+  }, [hasPermission, requestPermission]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -90,26 +102,25 @@ export default function PassengerHomeScreen(): React.JSX.Element {
   }, [location]);
 
   useEffect(() => {
-    const q = query(
+    const unsub = onSnapshot(
       collection(db, Collections.DRIVER_LOCATIONS),
-      where("isOnline", "==", true),
-    );
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      const locations: DriverLocation[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        locations.push({
-          driverId: doc.id,
-          driverName: data.driverName,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          isOnline: data.isOnline,
+      (snapshot) => {
+        const locations: DriverLocation[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.isOnline === true) {
+            locations.push({
+              driverId: doc.id,
+              driverName: data.name ?? undefined,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              isOnline: true,
+            });
+          }
         });
-      });
-      setDriverLocations(locations);
-    });
-
+        setDriverLocations(locations);
+      },
+    );
     return unsub;
   }, []);
 
@@ -124,8 +135,29 @@ export default function PassengerHomeScreen(): React.JSX.Element {
 
     const unsub = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
-        setActiveRide({ rideId: doc.id, ...doc.data() } as Ride);
+        const now = Date.now();
+        const thirtyMinMs = 30 * 60 * 1000;
+
+        const activeRides = snapshot.docs
+          .map((d) => ({ rideId: d.id, ...d.data() }) as Ride)
+          .filter((r) => {
+            if (r.paymentStatus === "completed") return false;
+            if (r.completedAt) return false;
+            if (r.cancelledAt) return false;
+            // Stale pending rides older than 30 minutes
+            if (r.status === "pending") {
+              const created = r.createdAt?.toMillis?.() ?? 0;
+              if (now - created > thirtyMinMs) return false;
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() ?? 0;
+            const bTime = b.createdAt?.toMillis?.() ?? 0;
+            return bTime - aTime;
+          });
+
+        setActiveRide(activeRides.length > 0 ? activeRides[0] : null);
       } else {
         setActiveRide(null);
       }
@@ -140,9 +172,41 @@ export default function PassengerHomeScreen(): React.JSX.Element {
 
   const handleActiveRidePress = useCallback((): void => {
     if (!activeRide) return;
-    const screen = RIDE_SCREEN[activeRide.status];
-    if (screen) {
-      router.push(screen as Href);
+
+    if (activeRide.status === "pending") {
+      router.push({
+        pathname: "/(passenger)/driver-offers" as Href,
+        params: {
+          rideId: activeRide.rideId,
+          pickupAddress: activeRide.pickupLocation.address,
+          pickupLat: activeRide.pickupLocation.latitude.toString(),
+          pickupLng: activeRide.pickupLocation.longitude.toString(),
+          destinationAddress: activeRide.dropoffLocation.address,
+          destinationLat: activeRide.dropoffLocation.latitude.toString(),
+          destinationLng: activeRide.dropoffLocation.longitude.toString(),
+          proposedFare: activeRide.proposedFare.toString(),
+          vehicleType: activeRide.requiredVehicleType ?? "",
+          passengerCount: (activeRide.passengerCount ?? 1).toString(),
+          existingRide: "true",
+        },
+      } as any);
+      return;
+    }
+
+    if (activeRide.status === "accepted") {
+      router.push({
+        pathname: "/(passenger)/booking-confirmation",
+        params: { rideId: activeRide.rideId },
+      } as any);
+      return;
+    }
+
+    if (activeRide.status === "in_progress") {
+      router.push({
+        pathname: "/(passenger)/active-ride",
+        params: { rideId: activeRide.rideId },
+      } as any);
+      return;
     }
   }, [activeRide]);
 
@@ -170,7 +234,7 @@ export default function PassengerHomeScreen(): React.JSX.Element {
     },
     centerButton: {
       position: "absolute",
-      bottom: "28%",
+      bottom: 220,
       right: spacing.screenPadding,
       width: 48,
       height: 48,
@@ -180,15 +244,18 @@ export default function PassengerHomeScreen(): React.JSX.Element {
       justifyContent: "center",
       ...shadows.medium,
     },
-    sheetBackground: {
+    bottomPanel: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: colors.surface,
       borderTopLeftRadius: borderRadius.xl,
       borderTopRightRadius: borderRadius.xl,
-    },
-    sheetContent: {
       paddingHorizontal: spacing.screenPadding,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+      ...shadows.medium,
     },
     whereButton: {
       backgroundColor: colors.primary,
@@ -230,9 +297,6 @@ export default function PassengerHomeScreen(): React.JSX.Element {
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
     },
-    indicator: {
-      backgroundColor: colors.border,
-    },
   });
 
   return (
@@ -272,42 +336,63 @@ export default function PassengerHomeScreen(): React.JSX.Element {
         />
       </TouchableOpacity>
 
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={0}
-        snapPoints={snapPoints}
-        backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.indicator}
-        enablePanDownToClose={false}
-      >
-        <View style={styles.sheetContent}>
-          {activeRide && (
-            <TouchableOpacity
-              style={styles.activeRideCard}
-              onPress={handleActiveRidePress}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.activeRideLabel}>Active Ride</Text>
-              <Text style={styles.activeRideStatus}>
-                {STATUS_LABELS[activeRide.status]}
-              </Text>
-              <Text style={styles.activeRideHint}>
-                Tap to view ride details
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={styles.whereButton}
-            onPress={handleWhereAreYouGoing}
-            activeOpacity={0.85}
+      {isSuspended && (
+        <View
+          style={{
+            position: "absolute",
+            top: 60,
+            left: spacing.screenPadding,
+            right: spacing.screenPadding,
+            backgroundColor: colors.error,
+            borderRadius: borderRadius.md,
+            padding: spacing.md,
+            zIndex: 20,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: typography.sizes.sm,
+              fontFamily: typography.fonts.bodyMedium,
+              color: colors.textInverse,
+              textAlign: "center",
+            }}
           >
-            <Text style={styles.whereButtonText}>Where are you going?</Text>
-          </TouchableOpacity>
+            Your account has been suspended. Contact support for assistance.
+          </Text>
         </View>
-      </BottomSheet>
+      )}
 
-      {locationLoading && (
+      <View style={styles.bottomPanel}>
+        {activeRide && (
+          <TouchableOpacity
+            style={styles.activeRideCard}
+            onPress={handleActiveRidePress}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.activeRideLabel}>Active Ride</Text>
+            <Text style={styles.activeRideStatus}>
+              {STATUS_LABELS[activeRide.status]}
+            </Text>
+            <Text style={styles.activeRideHint}>Tap to view ride details</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.whereButton,
+            isSuspended && { opacity: 0.4, backgroundColor: colors.textMuted },
+          ]}
+          onPress={isSuspended ? undefined : handleWhereAreYouGoing}
+          activeOpacity={0.85}
+          disabled={isSuspended}
+        >
+          <Text style={styles.whereButtonText}>
+            {isSuspended ? "Account Suspended" : "Where are you going?"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {locationLoading && !location && (
         <LoadingSpinner fullScreen message="Getting your location..." />
       )}
     </View>

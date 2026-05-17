@@ -8,13 +8,15 @@ import { router } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   where,
 } from "firebase/firestore";
 import { ArrowLeft, DollarSign } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   StatusBar,
@@ -121,7 +123,7 @@ function EarningRow({ item }: { item: EnrichedEarning }) {
           marginLeft: spacing.md,
         }}
       >
-        NGN {item.amount?.toLocaleString()}
+        ₦{item.amount?.toLocaleString()}
       </Text>
     </View>
   );
@@ -133,6 +135,8 @@ export default function EarningsDetailsScreen(): React.JSX.Element {
   const [earnings, setEarnings] = useState<EnrichedEarning[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("today");
+
+  const passengerCacheRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
@@ -151,12 +155,50 @@ export default function EarningsDetailsScreen(): React.JSX.Element {
       orderBy("createdAt", "desc"),
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
+    const unsub = onSnapshot(q, async (snap) => {
+      const rawEarnings = snap.docs.map((d) => ({
         earningId: d.id,
         ...d.data(),
       })) as EnrichedEarning[];
-      setEarnings(data);
+
+      // Fetch passenger names
+      const enriched: EnrichedEarning[] = await Promise.all(
+        rawEarnings.map(async (earning) => {
+          try {
+            const rideSnap = await getDoc(
+              doc(db, Collections.RIDES, earning.rideId),
+            );
+            if (!rideSnap.exists()) return earning;
+
+            const passengerId = rideSnap.data().passengerId;
+            if (!passengerId) return earning;
+
+            if (passengerCacheRef.current[passengerId]) {
+              return {
+                ...earning,
+                passengerName: passengerCacheRef.current[passengerId],
+              };
+            }
+
+            const passengerSnap = await getDoc(
+              doc(db, Collections.PASSENGERS, passengerId),
+            );
+            const pData = passengerSnap.data();
+            const name = passengerSnap.exists()
+              ? (pData?.name as string) ||
+                (pData?.phone as string) ||
+                "Passenger"
+              : "Passenger";
+
+            passengerCacheRef.current[passengerId] = name;
+            return { ...earning, passengerName: name };
+          } catch {
+            return earning;
+          }
+        }),
+      );
+
+      setEarnings(enriched);
       setLoading(false);
     });
 
@@ -229,7 +271,6 @@ export default function EarningsDetailsScreen(): React.JSX.Element {
     },
     tabTextActive: {
       color: colors.primary,
-      fontFamily: typography.fonts.body,
     },
     totalRow: {
       paddingHorizontal: spacing.screenPadding,
@@ -259,7 +300,6 @@ export default function EarningsDetailsScreen(): React.JSX.Element {
         <Text style={styles.title}>All Earnings</Text>
       </View>
 
-      {/* Filter tabs */}
       <View style={styles.tabRow}>
         {TABS.map((tab) => (
           <TouchableOpacity
@@ -280,12 +320,9 @@ export default function EarningsDetailsScreen(): React.JSX.Element {
         ))}
       </View>
 
-      {/* Period total */}
       <View style={styles.totalRow}>
         <Text style={styles.totalText}>Total for period</Text>
-        <Text style={styles.totalAmount}>
-          NGN {periodTotal.toLocaleString()}
-        </Text>
+        <Text style={styles.totalAmount}>₦{periodTotal.toLocaleString()}</Text>
       </View>
 
       {loading ? (

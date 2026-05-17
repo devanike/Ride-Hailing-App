@@ -1,8 +1,9 @@
 import { Button } from "@/components/common/Button";
+import { useAuthRefresh } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
+import { setHasSeenOnboarding } from "@/services/securityService";
 import { showError } from "@/utils/toast";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+// import { router } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
@@ -32,28 +33,20 @@ interface ViewableItemsChanged {
   changed: ViewToken[];
 }
 
-const ONBOARDING_KEY = "@onboarding_completed" as const;
-
 const slides: readonly OnboardingSlide[] = [
   {
     id: "1",
     title: "Find Your Ride",
     description: "Connect with verified drivers across UI campus in seconds",
-    image: require("@/assets/illustrations/onboarding-1.svg"),
+    image: require("../../../assets/illustrations/onboarding-1.png"),
   },
   {
     id: "2",
     title: "Track in Real-Time",
     description:
       "Know exactly where your driver is and get accurate arrival times",
-    image: require("@/assets/illustrations/onboarding-2.svg"),
+    image: require("../../../assets/illustrations/onboarding-2.png"),
   },
-  // {
-  //   id: '3',
-  //   title: 'Safe & Secure',
-  //   description: 'Pay with cash, transfer, or card. Your safety is our priority',
-  //   image: require('@/assets/illustrations/onboarding-3.svg'),
-  // },
 ] as const;
 
 export default function OnboardingScreen(): React.JSX.Element {
@@ -61,6 +54,7 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
+  const { refreshAuthState } = useAuthRefresh();
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: ViewableItemsChanged): void => {
@@ -77,21 +71,22 @@ export default function OnboardingScreen(): React.JSX.Element {
   const handleGetStarted = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-
-      // Add small delay for better UX
-      setTimeout(() => {
-        router.replace("/(auth)/welcome");
-      }, 200);
+      await setHasSeenOnboarding();
+      // setLoading(false);
+      refreshAuthState();
+      // setTimeout(() => {
+      //   router.replace("/(auth)/welcome");
+      // }, 200);
     } catch (error) {
       console.error("Error saving onboarding status:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to complete setup";
       showError("Error", errorMessage);
+      // setLoading(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshAuthState]);
 
   const handleNext = useCallback((): void => {
     if (currentIndex < slides.length - 1) {
@@ -107,21 +102,23 @@ export default function OnboardingScreen(): React.JSX.Element {
   const handleSkip = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
-      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+      await setHasSeenOnboarding();
+      // setLoading(false);
+      refreshAuthState();
 
-      // Add small delay for better UX
-      setTimeout(() => {
-        router.replace("/(auth)/welcome");
-      }, 200);
+      // setTimeout(() => {
+      //   router.replace("/(auth)/welcome");
+      // }, 200);
     } catch (error) {
       console.error("Error saving onboarding status:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to save progress";
       showError("Error", errorMessage);
+      // setLoading(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshAuthState]);
 
   const renderSlide = useCallback(
     ({ item }: { item: OnboardingSlide }): React.JSX.Element => {

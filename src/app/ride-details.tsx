@@ -6,7 +6,6 @@ import { PickupMarker } from "@/components/map/PickupMarker";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
-import { Driver } from "@/types/driver";
 import { Rating } from "@/types/rating";
 import { Ride } from "@/types/ride";
 import { format } from "date-fns";
@@ -32,12 +31,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+interface OtherParty {
+  name: string;
+  phone: string;
+  profilePhoto: string | null;
+}
+
 export default function RideDetailsScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
 
   const [ride, setRide] = useState<Ride | null>(null);
-  const [driver, setDriver] = useState<Driver | null>(null);
+  const [otherParty, setOtherParty] = useState<OtherParty | null>(null);
+  const [otherPartyLabel, setOtherPartyLabel] = useState("Driver");
   const [rating, setRating] = useState<Rating | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,29 +52,68 @@ export default function RideDetailsScreen(): React.JSX.Element {
 
     const load = async (): Promise<void> => {
       try {
+        const currentUid = auth.currentUser?.uid;
+        if (!currentUid) return;
+
         const rideSnap = await getDoc(doc(db, Collections.RIDES, rideId));
         if (!rideSnap.exists()) return;
         const rideData = { rideId: rideSnap.id, ...rideSnap.data() } as Ride;
         setRide(rideData);
 
-        if (rideData.driverId) {
-          const driverSnap = await getDoc(
-            doc(db, Collections.DRIVERS, rideData.driverId),
-          );
-          if (driverSnap.exists()) setDriver(driverSnap.data() as Driver);
+        const isPassenger = rideData.passengerId === currentUid;
+
+        if (isPassenger) {
+          setOtherPartyLabel("Driver");
+          if (rideData.driverId) {
+            try {
+              const driverSnap = await getDoc(
+                doc(db, Collections.DRIVERS, rideData.driverId),
+              );
+              if (driverSnap.exists()) {
+                const data = driverSnap.data();
+                setOtherParty({
+                  name: data.name ?? "Unknown driver",
+                  phone: data.phone ?? "",
+                  profilePhoto: data.profilePhoto ?? null,
+                });
+              }
+            } catch (err) {
+              console.log("Could not fetch driver:", err);
+            }
+          }
+        } else {
+          setOtherPartyLabel("Passenger");
+          if (rideData.passengerId) {
+            try {
+              const passengerSnap = await getDoc(
+                doc(db, Collections.PASSENGERS, rideData.passengerId),
+              );
+              if (passengerSnap.exists()) {
+                const data = passengerSnap.data();
+                setOtherParty({
+                  name: data.name ?? "Unknown passenger",
+                  phone: data.phone ?? "",
+                  profilePhoto: data.profilePhoto ?? null,
+                });
+              }
+            } catch (err) {
+              console.log("Could not fetch passenger:", err);
+            }
+          }
         }
 
-        const passengerId = auth.currentUser?.uid;
-        if (passengerId) {
+        // Fetch rating separately
+        try {
           const ratingsQ = query(
             collection(db, Collections.RATINGS),
             where("rideId", "==", rideId),
-            where("passengerId", "==", passengerId),
           );
           const ratingsSnap = await getDocs(ratingsQ);
           if (!ratingsSnap.empty) {
             setRating(ratingsSnap.docs[0].data() as Rating);
           }
+        } catch (ratingErr) {
+          console.log("Could not fetch rating:", ratingErr);
         }
       } catch (err) {
         console.error("Failed to load ride details:", err);
@@ -83,6 +128,8 @@ export default function RideDetailsScreen(): React.JSX.Element {
   const dateLabel = ride?.createdAt
     ? format(ride.createdAt.toDate(), "EEEE, d MMMM yyyy • h:mm a")
     : "—";
+
+  const isCancelled = ride?.status === "cancelled";
 
   const styles = StyleSheet.create({
     container: {
@@ -123,6 +170,19 @@ export default function RideDetailsScreen(): React.JSX.Element {
       ...shadows.small,
       marginBottom: spacing.lg,
     },
+    cancelledBadge: {
+      alignSelf: "flex-start",
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      backgroundColor: colors.error + "15",
+      borderRadius: borderRadius.sm,
+      marginBottom: spacing.md,
+    },
+    cancelledText: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.error,
+    },
     dateText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
@@ -146,18 +206,24 @@ export default function RideDetailsScreen(): React.JSX.Element {
       backgroundColor: colors.border,
       marginVertical: spacing.md,
     },
-    driverRow: {
+    partyLabel: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textMuted,
+      marginBottom: spacing.sm,
+    },
+    partyRow: {
       flexDirection: "row",
       alignItems: "center",
       marginBottom: spacing.md,
     },
-    driverPhoto: {
+    partyPhoto: {
       width: 36,
       height: 36,
       borderRadius: 18,
       backgroundColor: colors.backgroundAlt,
     },
-    driverPhotoPlaceholder: {
+    partyPhotoPlaceholder: {
       width: 36,
       height: 36,
       borderRadius: 18,
@@ -165,12 +231,12 @@ export default function RideDetailsScreen(): React.JSX.Element {
       alignItems: "center",
       justifyContent: "center",
     },
-    driverInitial: {
+    partyInitial: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.headingSemiBold,
       color: colors.textMuted,
     },
-    driverName: {
+    partyName: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textPrimary,
@@ -282,6 +348,12 @@ export default function RideDetailsScreen(): React.JSX.Element {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.card}>
+          {isCancelled && (
+            <View style={styles.cancelledBadge}>
+              <Text style={styles.cancelledText}>Cancelled</Text>
+            </View>
+          )}
+
           <Text style={styles.dateText}>{dateLabel}</Text>
 
           <Text style={styles.label}>From</Text>
@@ -294,72 +366,95 @@ export default function RideDetailsScreen(): React.JSX.Element {
             {ride?.dropoffLocation?.address ?? "—"}
           </Text>
 
-          <View style={styles.divider} />
-
-          <View style={styles.driverRow}>
-            {driver?.profilePhoto ? (
-              <Image
-                source={{ uri: driver.profilePhoto }}
-                style={styles.driverPhoto}
-              />
-            ) : (
-              <View style={styles.driverPhotoPlaceholder}>
-                <Text style={styles.driverInitial}>
-                  {driver?.name?.charAt(0).toUpperCase() ?? "?"}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.driverName}>
-              {driver?.name ?? "Unknown driver"}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Fare</Text>
-            <Text style={styles.infoValue}>
-              NGN {ride?.agreedFare?.toLocaleString() ?? "—"}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Payment</Text>
-            <Text style={styles.infoValue}>{ride?.paymentMethod ?? "—"}</Text>
-          </View>
-
-          {rating && (
+          {!isCancelled && (
             <>
               <View style={styles.divider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.ratingLabel}>Your rating</Text>
-                <View style={styles.ratingRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      size={14}
-                      color={
-                        s <= rating.rating ? colors.warning : colors.border
-                      }
-                      fill={s <= rating.rating ? colors.warning : "transparent"}
-                    />
-                  ))}
-                </View>
+
+              <Text style={styles.partyLabel}>{otherPartyLabel}</Text>
+              <View style={styles.partyRow}>
+                {otherParty?.profilePhoto ? (
+                  <Image
+                    source={{ uri: otherParty.profilePhoto }}
+                    style={styles.partyPhoto}
+                  />
+                ) : (
+                  <View style={styles.partyPhotoPlaceholder}>
+                    <Text style={styles.partyInitial}>
+                      {otherParty?.name?.charAt(0).toUpperCase() ?? "?"}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.partyName}>
+                  {otherParty?.name ??
+                    `Unknown ${otherPartyLabel.toLowerCase()}`}
+                </Text>
               </View>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Fare</Text>
+                <Text style={styles.infoValue}>
+                  ₦{ride?.agreedFare?.toLocaleString() ?? "—"}
+                </Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Payment</Text>
+                <Text style={styles.infoValue}>
+                  {ride?.paymentMethod
+                    ? ride.paymentMethod.charAt(0).toUpperCase() +
+                      ride.paymentMethod.slice(1)
+                    : "—"}
+                </Text>
+              </View>
+
+              {rating && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.infoRow}>
+                    <Text style={styles.ratingLabel}>Rating</Text>
+                    <View style={styles.ratingRow}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          size={14}
+                          color={
+                            s <= rating.rating ? colors.warning : colors.border
+                          }
+                          fill={
+                            s <= rating.rating ? colors.warning : "transparent"
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </>
+              )}
+            </>
+          )}
+
+          {isCancelled && ride?.cancellationReason && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.label}>Reason</Text>
+              <Text style={styles.value}>{ride.cancellationReason}</Text>
             </>
           )}
         </View>
 
-        <Button
-          title="Report an Issue"
-          onPress={() =>
-            router.push({
-              pathname: "/report-incident",
-              params: { rideId: rideId ?? "" },
-            })
-          }
-          variant="outline"
-          fullWidth
-          style={{ borderColor: colors.error }}
-        />
+        {!isCancelled && (
+          <Button
+            title="Report an Issue"
+            onPress={() =>
+              router.push({
+                pathname: "/report-incident",
+                params: { rideId: rideId ?? "" },
+              })
+            }
+            variant="outline"
+            fullWidth
+            style={{ borderColor: colors.error }}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

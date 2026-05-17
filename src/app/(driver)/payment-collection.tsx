@@ -1,8 +1,8 @@
 import { Button } from "@/components/common/Button";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import {
-  recordCardPayment,
   recordCashPayment,
   recordDriverEarning,
 } from "@/services/paymentService";
@@ -10,90 +10,105 @@ import { Collections } from "@/types/database";
 import { Ride } from "@/types/ride";
 import { showError, showSuccess } from "@/utils/toast";
 import { router, useLocalSearchParams } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useCallback, useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { Banknote, CheckCircle, Clock, CreditCard } from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { usePaystack } from "react-native-paystack-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PaymentCollectionScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
-  const { popup } = usePaystack();
 
   const [ride, setRide] = useState<Ride | null>(null);
-  const [passengerEmail, setPassengerEmail] = useState("passenger@uiride.com");
+  const [loading, setLoading] = useState(true);
+  const [paid, setPaid] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // Disable hardware back — driver must complete this step
+  const earningRecorded = useRef(false);
+
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => true);
     return () => sub.remove();
   }, []);
 
-  // Load ride
   useEffect(() => {
-    if (!rideId) return;
-    getDoc(doc(db, Collections.RIDES, rideId))
-      .then((snap) => {
-        if (snap.exists()) {
-          setRide({ rideId: snap.id, ...snap.data() } as Ride);
+    if (!rideId) {
+      setLoading(false);
+      return;
+    }
+
+    const unsub = onSnapshot(
+      doc(db, Collections.RIDES, rideId),
+      async (snap) => {
+        if (!snap.exists()) return;
+        const data = { rideId: snap.id, ...snap.data() } as Ride;
+        setRide(data);
+        setLoading(false);
+
+        // Auto-detect card payment completion
+        if (data.paymentStatus === "completed" && !earningRecorded.current) {
+          earningRecorded.current = true;
+          setPaid(true);
+
+          try {
+            const uid = auth.currentUser?.uid;
+            if (uid) {
+              await recordDriverEarning(
+                rideId,
+                uid,
+                data.agreedFare ?? 0,
+                (data.paymentMethod as "cash" | "card") ?? "card",
+              );
+            }
+            showSuccess(
+              "Payment Received",
+              "Your earnings have been recorded!",
+            );
+          } catch (err) {
+            console.error("Failed to record earning:", err);
+          }
         }
-      })
-      .catch((err) => console.error("Failed to load ride:", err));
+      },
+    );
+
+    return unsub;
   }, [rideId]);
 
-  // Load passenger email for Paystack
-  useEffect(() => {
-    if (!ride?.passengerId) return;
-    getDoc(doc(db, Collections.PASSENGERS, ride.passengerId))
-      .then((snap) => {
-        if (snap.exists()) {
-          const email = snap.data().email;
-          if (email) setPassengerEmail(email);
-        }
-      })
-      .catch(() => {});
-  }, [ride?.passengerId]);
-
-  const navigateHome = useCallback(() => {
-    router.replace("/(driver)");
-  }, []);
-
-  const handleCashPayment = useCallback(() => {
-    if (!ride) return;
+  const handleCashReceived = useCallback(() => {
+    if (!ride || !rideId) return;
     const displayAmount = ride.agreedFare?.toLocaleString() ?? "0";
 
     Alert.alert(
       "Confirm Cash Payment",
-      `Has the passenger paid NGN ${displayAmount} in cash?`,
+      `Has the passenger paid ₦${displayAmount} in cash?`,
       [
         { text: "No", style: "cancel" },
         {
           text: "Yes, Confirm",
           onPress: async () => {
             const uid = auth.currentUser?.uid;
-            if (!rideId || !uid || !ride) return;
+            if (!uid) return;
             setProcessing(true);
             try {
               await recordCashPayment(rideId);
               await recordDriverEarning(
                 rideId,
                 uid,
-                // ride.passengerId,
                 ride.agreedFare ?? 0,
                 "cash",
-                // null,
               );
+              setPaid(true);
+              earningRecorded.current = true;
               showSuccess("Payment Recorded", "Cash payment confirmed");
-              navigateHome();
             } catch (err) {
               showError("Error", "Failed to record payment");
               console.error(err);
@@ -104,59 +119,47 @@ export default function PaymentCollectionScreen(): React.JSX.Element {
         },
       ],
     );
-  }, [ride, rideId, navigateHome]);
+  }, [ride, rideId]);
 
-  const handleCardPayment = useCallback(() => {
-    if (!ride) return;
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+  const handleDone = useCallback(() => {
+    router.replace("/(driver)");
+  }, []);
 
-    const fare = ride.agreedFare ?? 0;
-    const reference = `ride_${rideId}_${Date.now()}`;
+  const fareDisplay = ride?.agreedFare?.toLocaleString() ?? "—";
+  const paymentMethod = ride?.paymentMethod ?? null;
+  // const waitingForMethod = !paymentMethod && !paid;
+  const waitingForCard = paymentMethod === "card" && !paid;
+  const waitingForCash = paymentMethod === "cash" && !paid;
 
-    popup.checkout({
-      email: passengerEmail,
-      amount: fare * 100,
-      reference,
-      metadata: {
-        custom_fields: [
-          {
-            display_name: "Ride ID",
-            variable_name: "ride_id",
-            value: rideId ?? "",
-          },
-        ],
-      },
-      onSuccess: async (res: any) => {
-        setProcessing(true);
-        try {
-          const ref: string = res?.reference ?? reference;
-          await recordCardPayment(rideId!, ref);
-          await recordDriverEarning(
-            rideId!,
-            uid,
-            // ride.passengerId,
-            fare,
-            "card",
-            // ref,
-          );
-          showSuccess("Payment Received", "Card payment successful");
-          navigateHome();
-        } catch (err) {
-          showError("Error", "Payment recorded but earning failed");
-          console.error(err);
-          navigateHome();
-        } finally {
-          setProcessing(false);
-        }
-      },
-      onCancel: () => {
-        // User dismissed the Paystack popup — do nothing
-      },
-    });
-  }, [ride, rideId, passengerEmail, navigateHome, popup]);
+  const getStatusIcon = () => {
+    if (paid) return <CheckCircle size={40} color={colors.success} />;
+    if (waitingForCard) return <CreditCard size={40} color={colors.info} />;
+    if (waitingForCash) return <Banknote size={40} color={colors.warning} />;
+    return <Clock size={40} color={colors.warning} />;
+  };
 
-  const fare = ride?.agreedFare ?? 0;
+  const getIconStyle = () => {
+    if (paid) return { backgroundColor: colors.success + "20" };
+    if (waitingForCard) return { backgroundColor: colors.info + "20" };
+    if (waitingForCash) return { backgroundColor: colors.warning + "20" };
+    return { backgroundColor: colors.warning + "20" };
+  };
+
+  const getStatusText = () => {
+    if (paid) return "Payment Complete!";
+    if (waitingForCard) return "Passenger Paying by Card";
+    if (waitingForCash) return "Cash Payment Selected";
+    return "Waiting for Passenger";
+  };
+
+  const getStatusHint = () => {
+    if (paid) return "Your earnings have been recorded.";
+    if (waitingForCard)
+      return "This screen will update automatically once the card payment succeeds.";
+    if (waitingForCash)
+      return "Confirm below only after the passenger has handed you the cash.";
+    return "The passenger is choosing their payment method (cash or card).";
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -166,89 +169,186 @@ export default function PaymentCollectionScreen(): React.JSX.Element {
     header: {
       paddingHorizontal: spacing.screenPadding,
       paddingVertical: spacing.lg,
+      backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      backgroundColor: colors.surface,
     },
-    title: {
+    headerTitle: {
       fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.heading,
       color: colors.textPrimary,
       textAlign: "center",
     },
-    body: {
-      flex: 1,
+    scrollContent: {
+      flexGrow: 1,
       paddingHorizontal: spacing.screenPadding,
       paddingTop: spacing.xl,
-      gap: spacing.lg,
-    },
-    fareCard: {
-      backgroundColor: colors.surface,
-      borderRadius: borderRadius.lg,
-      padding: spacing.xl,
+      paddingBottom: spacing.xxl + 60,
       alignItems: "center",
-      ...shadows.medium,
     },
-    fareLabel: {
-      fontSize: typography.sizes.sm,
-      fontFamily: typography.fonts.bodyRegular,
-      color: colors.textSecondary,
+    iconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: spacing.lg,
+    },
+    statusText: {
+      fontSize: typography.sizes.xl,
+      fontFamily: typography.fonts.headingSemiBold,
+      color: colors.textPrimary,
+      textAlign: "center",
       marginBottom: spacing.sm,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
     },
-    fareAmount: {
-      fontSize: typography.sizes["4xl"],
-      fontFamily: typography.fonts.heading,
-      color: colors.primary,
-    },
-    instruction: {
+    statusHint: {
       fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
       textAlign: "center",
+      marginBottom: spacing.xl,
+      paddingHorizontal: spacing.lg,
     },
-    buttons: {
-      gap: spacing.md,
+    fareCard: {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      width: "100%",
+      alignItems: "center",
+      marginBottom: spacing.xl,
+      ...shadows.medium,
+    },
+    fareLabel: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textMuted,
+      marginBottom: spacing.xs,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+    },
+    fareAmount: {
+      fontSize: 36,
+      fontFamily: typography.fonts.heading,
+      color: colors.primary,
+      marginBottom: spacing.xs,
+    },
+    paymentMethodText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textSecondary,
+    },
+    locationCard: {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      width: "100%",
+      marginBottom: spacing.xl,
+      ...shadows.small,
+    },
+    locationLabel: {
+      fontSize: typography.sizes.xs,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textMuted,
+      marginBottom: 2,
+    },
+    locationText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textPrimary,
+      marginBottom: spacing.md,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginBottom: spacing.md,
+      width: "100%",
+    },
+    buttonContainer: {
+      width: "100%",
+      gap: spacing.sm,
     },
   });
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <StatusBar barStyle="dark-content" />
+        <LoadingSpinner message="Loading trip details..." />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Collect Payment</Text>
-      </View>
-
-      <View style={styles.body}>
-        <View style={styles.fareCard}>
-          <Text style={styles.fareLabel}>Agreed Fare</Text>
-          <Text style={styles.fareAmount}>NGN {fare.toLocaleString()}</Text>
-        </View>
-
-        <Text style={styles.instruction}>
-          Select how the passenger is paying
+        <Text style={styles.headerTitle}>
+          {paid ? "Payment Received" : "Collect Payment"}
         </Text>
-
-        <View style={styles.buttons}>
-          <Button
-            title="Cash Received"
-            onPress={handleCashPayment}
-            variant="outline"
-            fullWidth
-            loading={processing}
-            disabled={!ride}
-          />
-          <Button
-            title="Card Payment"
-            onPress={handleCardPayment}
-            variant="primary"
-            fullWidth
-            disabled={!ride || processing}
-          />
-        </View>
       </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.iconContainer, getIconStyle()]}>
+          {getStatusIcon()}
+        </View>
+
+        <Text style={styles.statusText}>{getStatusText()}</Text>
+        <Text style={styles.statusHint}>{getStatusHint()}</Text>
+
+        <View style={styles.fareCard}>
+          <Text style={styles.fareLabel}>Trip Fare</Text>
+          <Text style={styles.fareAmount}>₦{fareDisplay}</Text>
+          {paid && ride?.paymentMethod && (
+            <Text style={styles.paymentMethodText}>
+              Paid via {ride.paymentMethod === "cash" ? "Cash" : "Card"}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.locationCard}>
+          <Text style={styles.locationLabel}>From</Text>
+          <Text style={styles.locationText} numberOfLines={2}>
+            {ride?.pickupLocation?.address ?? "—"}
+          </Text>
+          <View style={styles.divider} />
+          <Text style={styles.locationLabel}>To</Text>
+          <Text style={styles.locationText} numberOfLines={1}>
+            {ride?.dropoffLocation?.address ?? "—"}
+          </Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          {waitingForCash && (
+            <Button
+              title="Confirm Cash Received"
+              onPress={handleCashReceived}
+              variant="primary"
+              fullWidth
+              loading={processing}
+            />
+          )}
+          {waitingForCard && (
+            <LoadingSpinner message="Waiting for card payment..." />
+          )}
+          {paid && (
+            <Button
+              title="Done"
+              onPress={handleDone}
+              variant="primary"
+              fullWidth
+            />
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

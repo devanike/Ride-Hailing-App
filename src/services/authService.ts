@@ -9,6 +9,7 @@ import {
   UserCredential,
 } from "firebase/auth";
 import { auth } from "./firebaseConfig";
+import { clearAllSecurityData } from "./securityService";
 
 // Auth Service - Handles Firebase Authentication with Phone Number
 
@@ -90,6 +91,10 @@ export const getCurrentUser = (): User | null => {
 // Logout current user
 export const logout = async (): Promise<void> => {
   try {
+    // Clear all security data (PIN, biometric, known devices, etc.)
+    await clearAllSecurityData();
+
+    // Then sign out from Firebase
     await signOut(auth);
   } catch (error: any) {
     console.error("Error logging out:", error);

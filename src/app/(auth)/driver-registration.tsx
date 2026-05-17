@@ -8,8 +8,9 @@ import { auth, db } from "@/services/firebaseConfig";
 import { uploadImage, uploadMultipleImages } from "@/services/uploadService";
 import { showError, showSuccess } from "@/utils/toast";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+// import { router } from "expo-router";
+import { useAuthRefresh } from "@/contexts/AuthContext";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Calendar, CreditCard } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -36,6 +37,7 @@ interface ImageUpload {
 
 export default function DriverRegistrationScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
+  const { refreshAuthState } = useAuthRefresh();
 
   // Vehicle Information
   const [vehicleType, setVehicleType] = useState<VehicleType>("car");
@@ -204,10 +206,11 @@ export default function DriverRegistrationScreen() {
         updateData.vehicleYear = vehicleYear ? parseInt(vehicleYear) : null;
       }
 
-      await updateDoc(doc(db, "drivers", uid), updateData);
+      await setDoc(doc(db, "drivers", uid), updateData, { merge: true });
 
       showSuccess("Registration Complete", "Your details have been saved");
-      router.push("/(auth)/pin-setup");
+      // router.push("/(auth)/pin-setup");
+      refreshAuthState();
     } catch (error: any) {
       console.error("Registration error:", error);
       showError(

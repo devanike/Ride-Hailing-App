@@ -10,9 +10,10 @@ import { Collections } from "@/types/database";
 import { Driver } from "@/types/driver";
 import { Ride } from "@/types/ride";
 import { showError } from "@/utils/toast";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { router, useLocalSearchParams } from "expo-router";
 import {
+  addDoc,
+  collection,
   doc,
   getDoc,
   onSnapshot,
@@ -36,7 +37,7 @@ import {
   View,
 } from "react-native";
 
-const CANCEL_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
+const CANCEL_WINDOW_MS = 2 * 60 * 1000;
 
 function getVehicleLabel(driver: Driver): string {
   if (driver.vehicleType === "car") {
@@ -60,10 +61,8 @@ interface DriverLocation {
 }
 
 export default function BookingConfirmationScreen(): React.JSX.Element {
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["40%", "65%"], []);
 
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
 
@@ -81,7 +80,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
   const cancelWindowRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const acceptedAtRef = useRef<number | null>(null);
 
-  // Fetch ride doc once, then set up listener for status changes
   useEffect(() => {
     if (!rideId) return;
 
@@ -89,10 +87,9 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
       doc(db, Collections.RIDES, rideId),
       async (snap) => {
         if (!snap.exists()) return;
-        const rideData = snap.data() as Ride;
+        const rideData = { rideId: snap.id, ...snap.data() } as Ride;
         setRide(rideData);
 
-        // Fetch driver once we have the driverId
         if (rideData.driverId && !driverFetchedRef.current) {
           driverFetchedRef.current = true;
           try {
@@ -107,7 +104,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
           }
         }
 
-        // Start cancel window from acceptedAt
         if (rideData.acceptedAt && !acceptedAtRef.current) {
           const acceptedMs = rideData.acceptedAt.toMillis();
           acceptedAtRef.current = acceptedMs;
@@ -125,7 +121,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
 
         setLoading(false);
 
-        // Navigate to active-ride when driver starts the trip
         if (rideData.status === "in_progress") {
           router.replace({
             pathname: "/(passenger)/active-ride",
@@ -145,7 +140,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
     };
   }, [rideId]);
 
-  // Listen to driver location in real time
   useEffect(() => {
     if (!ride?.driverId) return;
 
@@ -165,7 +159,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
     return unsub;
   }, [ride?.driverId]);
 
-  // Recalculate ETA whenever driver location changes
   useEffect(() => {
     if (!driverLocation || !ride?.pickupLocation) return;
 
@@ -181,13 +174,10 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
         Math.cos(toRad(ride.pickupLocation.latitude)) *
         Math.sin(dLng / 2) ** 2;
     const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    // Assume 20 km/h average campus speed → minutes
     const minutes = Math.max(1, Math.round((distKm / 20) * 60));
     setEta(minutes);
   }, [driverLocation, ride?.pickupLocation]);
 
-  // Pan map to driver position when it moves
   useEffect(() => {
     if (!driverLocation) return;
     mapRef.current?.animateToRegion(
@@ -217,13 +207,28 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
         cancellationReason: "Passenger cancelled after acceptance",
         updatedAt: serverTimestamp(),
       });
+
+      // Notify the driver
+      if (ride?.driverId) {
+        await addDoc(collection(db, Collections.NOTIFICATIONS), {
+          userId: ride.driverId,
+          type: "ride_cancelled",
+          title: "Ride Cancelled",
+          body: "The passenger has cancelled the ride.",
+          rideId,
+          reportId: null,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       router.replace("/(passenger)");
     } catch (err) {
       console.error("Failed to cancel ride:", err);
       showError("Failed to cancel", "Please try again.");
       setCancelling(false);
     }
-  }, [rideId, canCancel]);
+  }, [rideId, canCancel, ride?.driverId]);
 
   const mapInitialRegion = useMemo(() => {
     if (ride?.pickupLocation) {
@@ -244,24 +249,37 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
     map: {
       flex: 1,
     },
-    loadingOverlay: {
-      ...StyleSheet.absoluteFillObject,
+    loadingContainer: {
+      flex: 1,
       backgroundColor: colors.background,
       alignItems: "center",
       justifyContent: "center",
     },
-    sheetContent: {
-      flex: 1,
+    bottomPanel: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
       paddingHorizontal: spacing.screenPadding,
+      paddingTop: spacing.md,
       paddingBottom: spacing.xl,
+      ...shadows.large,
     },
-
-    // Driver header
+    handleBar: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: "center",
+      marginBottom: spacing.md,
+    },
     driverRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingTop: spacing.xs,
-      paddingBottom: spacing.md,
+      marginBottom: spacing.md,
     },
     driverPhoto: {
       width: 56,
@@ -302,22 +320,17 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textSecondary,
     },
-
-    // Vehicle row
     vehicleText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textMuted,
-      paddingBottom: spacing.md,
+      marginBottom: spacing.md,
     },
-
     divider: {
       height: 1,
       backgroundColor: colors.border,
       marginBottom: spacing.md,
     },
-
-    // Fare / ETA rows
     infoRow: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -334,8 +347,6 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
       fontFamily: typography.fonts.headingSemiBold,
       color: colors.textPrimary,
     },
-
-    // Action buttons
     actions: {
       gap: spacing.sm,
       marginTop: spacing.xs,
@@ -344,11 +355,9 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingOverlay}>
-          <LoadingSpinner message="Loading booking details..." />
-        </View>
+        <LoadingSpinner message="Loading booking details..." />
       </View>
     );
   }
@@ -399,88 +408,76 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
         )}
       </MapComponent>
 
-      <BottomSheet
-        ref={bottomSheetRef}
-        snapPoints={snapPoints}
-        index={0}
-        backgroundStyle={{ backgroundColor: colors.surface }}
-        handleIndicatorStyle={{ backgroundColor: colors.border }}
-        enablePanDownToClose={false}
-      >
-        <View style={styles.sheetContent}>
-          {/* Driver photo, name, rating */}
-          <View style={styles.driverRow}>
-            {driver?.profilePhoto ? (
-              <Image
-                source={{ uri: driver.profilePhoto }}
-                style={styles.driverPhoto}
-              />
-            ) : (
-              <View style={styles.driverPhotoPlaceholder}>
-                <Text style={styles.driverInitial}>
-                  {driver?.name?.charAt(0).toUpperCase() ?? "?"}
-                </Text>
-              </View>
-            )}
-            <View style={styles.driverMeta}>
-              <Text style={styles.driverName}>
-                {driver?.name ?? "Your driver"}
+      <View style={styles.bottomPanel}>
+        <View style={styles.handleBar} />
+
+        <View style={styles.driverRow}>
+          {driver?.profilePhoto ? (
+            <Image
+              source={{ uri: driver.profilePhoto }}
+              style={styles.driverPhoto}
+            />
+          ) : (
+            <View style={styles.driverPhotoPlaceholder}>
+              <Text style={styles.driverInitial}>
+                {driver?.name?.charAt(0).toUpperCase() ?? "?"}
               </Text>
-              <View style={styles.ratingRow}>
-                <Star size={14} color={colors.warning} fill={colors.warning} />
-                <Text style={styles.ratingText}>
-                  {driver?.rating?.toFixed(1) ?? "—"}
-                </Text>
-              </View>
+            </View>
+          )}
+          <View style={styles.driverMeta}>
+            <Text style={styles.driverName}>
+              {driver?.name ?? "Your driver"}
+            </Text>
+            <View style={styles.ratingRow}>
+              <Star size={14} color={colors.warning} fill={colors.warning} />
+              <Text style={styles.ratingText}>
+                {driver?.rating?.toFixed(1) ?? "—"}
+              </Text>
             </View>
           </View>
-
-          {/* Vehicle info */}
-          {driver && (
-            <Text style={styles.vehicleText}>{getVehicleLabel(driver)}</Text>
-          )}
-
-          <View style={styles.divider} />
-
-          {/* Agreed fare */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Agreed fare</Text>
-            <Text style={styles.infoValue}>
-              NGN {ride?.agreedFare?.toLocaleString() ?? "—"}
-            </Text>
-          </View>
-
-          {/* ETA */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>ETA</Text>
-            <Text style={styles.infoValue}>
-              {eta !== null ? `${eta} min` : "Calculating..."}
-            </Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <Button
-              title="Call Driver"
-              onPress={handleCallDriver}
-              variant="outline"
-              fullWidth
-              icon={<Phone size={18} color={colors.primary} />}
-            />
-            {canCancel && (
-              <Button
-                title="Cancel Ride"
-                onPress={handleCancelRide}
-                variant="danger"
-                fullWidth
-                loading={cancelling}
-              />
-            )}
-          </View>
         </View>
-      </BottomSheet>
+
+        {driver && (
+          <Text style={styles.vehicleText}>{getVehicleLabel(driver)}</Text>
+        )}
+
+        <View style={styles.divider} />
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Agreed fare</Text>
+          <Text style={styles.infoValue}>
+            ₦{ride?.agreedFare?.toLocaleString() ?? "—"}
+          </Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>ETA</Text>
+          <Text style={styles.infoValue}>
+            {eta !== null ? `${eta} min` : "Calculating..."}
+          </Text>
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.actions}>
+          <Button
+            title="Call Driver"
+            onPress={handleCallDriver}
+            variant="outline"
+            fullWidth
+            icon={<Phone size={18} color={colors.primary} />}
+          />
+          {canCancel && (
+            <Button
+              title="Cancel Ride"
+              onPress={handleCancelRide}
+              variant="danger"
+              fullWidth
+              loading={cancelling}
+            />
+          )}
+        </View>
+      </View>
     </View>
   );
 }

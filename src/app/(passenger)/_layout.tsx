@@ -1,6 +1,6 @@
 import { useTheme } from "@/hooks/useTheme";
 import { Tabs } from "expo-router";
-import { Clock, MapPin, User } from "lucide-react-native";
+import { Clock, Home, User } from "lucide-react-native";
 import React from "react";
 
 export default function PassengerLayout(): React.JSX.Element {
@@ -29,7 +29,7 @@ export default function PassengerLayout(): React.JSX.Element {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => <MapPin size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -52,6 +52,7 @@ export default function PassengerLayout(): React.JSX.Element {
       <Tabs.Screen name="driver-offers" options={{ href: null }} />
       <Tabs.Screen name="booking-confirmation" options={{ href: null }} />
       <Tabs.Screen name="active-ride" options={{ href: null }} />
+      <Tabs.Screen name="payment" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -9,13 +9,15 @@ import { router } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   where,
 } from "firebase/firestore";
 import { DollarSign } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -149,6 +151,7 @@ export default function EarningsScreen(): React.JSX.Element {
   const { colors, spacing, typography } = useTheme();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [earnings, setEarnings] = useState<EnrichedEarning[]>([]);
+  const passengerCacheRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -168,12 +171,50 @@ export default function EarningsScreen(): React.JSX.Element {
       orderBy("createdAt", "desc"),
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
+    const unsub = onSnapshot(q, async (snap) => {
+      const rawEarnings = snap.docs.map((d) => ({
         earningId: d.id,
         ...d.data(),
       })) as EnrichedEarning[];
-      setEarnings(data);
+
+      // Fetch passenger names for each earning
+      const enriched: EnrichedEarning[] = await Promise.all(
+        rawEarnings.map(async (earning) => {
+          // Need to get passenger ID from the ride
+          try {
+            const rideSnap = await getDoc(
+              doc(db, Collections.RIDES, earning.rideId),
+            );
+            if (!rideSnap.exists()) return earning;
+
+            const passengerId = rideSnap.data().passengerId;
+            if (!passengerId) return earning;
+
+            // Check cache
+            if (passengerCacheRef.current[passengerId]) {
+              return {
+                ...earning,
+                passengerName: passengerCacheRef.current[passengerId],
+              };
+            }
+
+            // Fetch from Firestore
+            const passengerSnap = await getDoc(
+              doc(db, Collections.PASSENGERS, passengerId),
+            );
+            const name = passengerSnap.exists()
+              ? (passengerSnap.data().name as string) || "Passenger"
+              : "Passenger";
+
+            passengerCacheRef.current[passengerId] = name;
+            return { ...earning, passengerName: name };
+          } catch {
+            return earning;
+          }
+        }),
+      );
+
+      setEarnings(enriched);
       setLoading(false);
     });
 
@@ -249,7 +290,7 @@ export default function EarningsScreen(): React.JSX.Element {
     },
     body: {
       flex: 1,
-      padding: spacing.screenPadding,
+      // padding: spacing.screenPadding,
     },
     cardsRow: {
       flexDirection: "row",
@@ -361,7 +402,10 @@ export default function EarningsScreen(): React.JSX.Element {
             </View>
           ) : null
         }
-        contentContainerStyle={{ paddingBottom: spacing.xxl }}
+        contentContainerStyle={{
+          paddingBottom: spacing.xxl,
+          paddingHorizontal: spacing.screenPadding,
+        }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>

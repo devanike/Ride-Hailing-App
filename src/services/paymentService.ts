@@ -1,9 +1,9 @@
+import { Collections } from "@/types/database";
 import {
+  Payment,
   PaystackInitializeResponse,
   PaystackVerifyResponse,
-  Payment,
 } from "@/types/payment";
-import { Collections } from "@/types/database";
 import {
   addDoc,
   collection,
@@ -112,7 +112,7 @@ export const recordPayment = async (
     });
 
     await updateDoc(doc(db, Collections.RIDES, rideId), {
-      paymentStatus: "paid",
+      paymentStatus: "completed",
       paymentMethod: method,
       paymentReference: reference ?? null,
       paidAt: serverTimestamp(),
@@ -181,7 +181,7 @@ export const recordCardPayment = async (
 ): Promise<void> => {
   try {
     await updateDoc(doc(db, Collections.RIDES, rideId), {
-      paymentStatus: "paid",
+      paymentStatus: "completed",
       paymentMethod: "card",
       paymentReference: reference,
       paidAt: serverTimestamp(),
@@ -196,7 +196,7 @@ export const recordCardPayment = async (
 export const recordCashPayment = async (rideId: string): Promise<void> => {
   try {
     await updateDoc(doc(db, Collections.RIDES, rideId), {
-      paymentStatus: "paid",
+      paymentStatus: "completed",
       paymentMethod: "cash",
       paidAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -204,5 +204,17 @@ export const recordCashPayment = async (rideId: string): Promise<void> => {
   } catch (error: any) {
     console.error("Error recording cash payment:", error);
     throw new Error("Failed to record payment");
+  }
+};
+
+export const indicateCashPayment = async (rideId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, Collections.RIDES, rideId), {
+      paymentMethod: "cash",
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error: any) {
+    console.error("Error indicating cash payment:", error);
+    throw new Error("Failed to update payment method");
   }
 };

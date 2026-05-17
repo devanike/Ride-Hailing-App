@@ -1,12 +1,13 @@
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
+import { useAuthRefresh } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { uploadImage } from "@/services/uploadService";
 import { showError, showSuccess } from "@/utils/toast";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useLocalSearchParams } from "expo-router";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Camera, Mail, User } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -27,6 +28,7 @@ export default function ProfileSetupScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
   const params = useLocalSearchParams();
   const userType = (params.userType as string) ?? "passenger";
+  const { refreshAuthState } = useAuthRefresh();
 
   const [email, setEmail] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -89,28 +91,38 @@ export default function ProfileSetupScreen() {
 
     try {
       setLoading(true);
-      const uid = auth.currentUser?.uid;
+      const user = auth.currentUser;
 
-      if (!uid) {
+      if (!user) {
         showError("Error", "User not found. Please try again.");
         return;
       }
 
-      // Update the correct collection document
       const collection = userType === "driver" ? "drivers" : "passengers";
-      await updateDoc(doc(db, collection, uid), {
-        email: email.trim() || null,
-        profilePhoto: profilePhoto || null,
-        updatedAt: serverTimestamp(),
-      });
+
+      // Use setDoc with merge instead of updateDoc
+      await setDoc(
+        doc(db, collection, user.uid),
+        {
+          uid: user.uid,
+          phoneNumber: user.phoneNumber || null,
+          email: email.trim() || null,
+          profilePhoto: profilePhoto || null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
 
       showSuccess("Success", "Profile updated successfully");
 
-      if (userType === "driver") {
-        router.push("/(auth)/driver-registration");
-      } else {
-        router.push("/(auth)/pin-setup");
-      }
+      refreshAuthState();
+
+      // if (userType === "driver") {
+      //   router.push("/(auth)/driver-registration");
+      // } else {
+      //   router.push("/(auth)/pin-setup");
+      // }
     } catch (error: any) {
       console.error("Profile update error:", error);
       showError("Update Failed", error.message || "Failed to update profile");
@@ -119,11 +131,42 @@ export default function ProfileSetupScreen() {
     }
   };
 
-  const handleSkip = () => {
-    if (userType === "driver") {
-      router.push("/(auth)/driver-registration");
-    } else {
-      router.push("/(auth)/pin-setup");
+  const handleSkip = async () => {
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+
+      if (!user) {
+        showError("Error", "User not found. Please try again.");
+        return;
+      }
+
+      const collection = userType === "driver" ? "drivers" : "passengers";
+
+      // Create minimal document
+      await setDoc(
+        doc(db, collection, user.uid),
+        {
+          uid: user.uid,
+          phoneNumber: user.phoneNumber || null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      refreshAuthState();
+
+      // if (userType === "driver") {
+      //   // router.push("/(auth)/driver-registration");
+      // } else {
+      //   router.push("/(auth)/pin-setup");
+      // }
+    } catch (error: any) {
+      console.error("Skip profile error:", error);
+      showError("Error", "Failed to continue. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 

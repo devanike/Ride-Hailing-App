@@ -9,7 +9,6 @@ import { auth, db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
 import { Ride } from "@/types/ride";
 import { showError } from "@/utils/toast";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   addDoc,
@@ -21,7 +20,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { Flag, MapPin } from "lucide-react-native";
+import { Flag, MapPin, Phone } from "lucide-react-native";
 import React, {
   useCallback,
   useEffect,
@@ -32,6 +31,7 @@ import React, {
 import {
   Image,
   Linking,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -48,11 +48,10 @@ interface Passenger {
 }
 
 export default function DriverActiveRideScreen(): React.JSX.Element {
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
-  const { location } = useLocation();
+  const { location } = useLocation(true);
   const mapRef = useRef<MapComponentRef>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
   const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationRef = useRef(location);
   const passengerFetchedRef = useRef(false);
@@ -106,6 +105,15 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
       if (!snap.exists()) return;
       const data = { rideId: snap.id, ...snap.data() } as Ride;
       setRide(data);
+
+      // If ride was cancelled by passenger, go back
+      if (
+        data.status === "cancelled" &&
+        data.cancelledBy !== auth.currentUser?.uid
+      ) {
+        showError("Ride Cancelled", "The passenger cancelled this ride.");
+        router.replace("/(driver)");
+      }
     });
 
     return unsub;
@@ -151,13 +159,26 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
         status: "arrived",
         updatedAt: serverTimestamp(),
       });
+
+      if (ride?.passengerId) {
+        await addDoc(collection(db, Collections.NOTIFICATIONS), {
+          userId: ride.passengerId,
+          type: "driver_arrived",
+          title: "Driver Arrived",
+          body: "Your driver has arrived at the pickup point.",
+          rideId,
+          reportId: null,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
+      }
     } catch (err) {
       showError("Error", "Could not update status");
       console.error(err);
     } finally {
       setActionLoading(false);
     }
-  }, [rideId]);
+  }, [rideId, ride?.passengerId]);
 
   const handleStartTrip = useCallback(async () => {
     if (!rideId) return;
@@ -209,7 +230,39 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
     }
   }, [rideId, ride]);
 
-  const snapPoints = useMemo(() => ["35%", "55%"], []);
+  const handleCancelRide = useCallback(async () => {
+    if (!rideId || !ride) return;
+    setActionLoading(true);
+    try {
+      await updateDoc(doc(db, Collections.RIDES, rideId), {
+        status: "cancelled",
+        driverId: null,
+        agreedFare: null,
+        cancelledAt: serverTimestamp(),
+        cancelledBy: auth.currentUser?.uid ?? null,
+        cancellationReason: "Driver cancelled the ride",
+        updatedAt: serverTimestamp(),
+      });
+
+      await addDoc(collection(db, Collections.NOTIFICATIONS), {
+        userId: ride.passengerId,
+        type: "ride_cancelled",
+        title: "Ride Cancelled",
+        body: "Your driver has cancelled the ride.",
+        rideId,
+        reportId: null,
+        isRead: false,
+        createdAt: serverTimestamp(),
+      });
+
+      router.replace("/(driver)");
+    } catch (err) {
+      showError("Error", "Could not cancel ride");
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [rideId, ride]);
 
   const rideStatus = ride?.status ?? "accepted";
 
@@ -236,11 +289,60 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
     return [];
   }, [location, ride, rideStatus]);
 
+  const getStatusLabel = (): { text: string; color: string } => {
+    switch (rideStatus) {
+      case "accepted":
+        return { text: "Heading to Pickup", color: colors.primary };
+      case "arrived":
+        return { text: "Waiting for Passenger", color: colors.warning };
+      case "in_progress":
+        return { text: "Trip in Progress", color: colors.success };
+      default:
+        return { text: "Active Ride", color: colors.primary };
+    }
+  };
+
+  const statusInfo = getStatusLabel();
+
   const styles = StyleSheet.create({
-    container: { flex: 1 },
-    map: { flex: 1 },
-    sheetContent: {
+    container: {
       flex: 1,
+    },
+    map: {
+      flex: 1,
+    },
+    emptyContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyText: {
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textSecondary,
+    },
+    bottomPanel: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+      maxHeight: "50%",
+      ...shadows.large,
+    },
+    handleBar: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: "center",
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    panelContent: {
       paddingHorizontal: spacing.screenPadding,
       paddingBottom: spacing.xl,
     },
@@ -282,6 +384,11 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
       fontFamily: typography.fonts.headingSemiBold,
       color: colors.textPrimary,
     },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: spacing.sm,
+    },
     locationRow: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -317,12 +424,16 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
     buttons: {
       gap: spacing.sm,
     },
-    indicator: {
-      backgroundColor: colors.border,
-    },
   });
 
-  if (!ride) return <View style={styles.container} />;
+  if (!ride) {
+    return (
+      <View style={styles.emptyContainer}>
+        <StatusBar barStyle="dark-content" />
+        <Text style={styles.emptyText}>Loading ride...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -359,34 +470,17 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
         />
       </MapComponent>
 
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={0}
-        snapPoints={snapPoints}
-        backgroundStyle={{ backgroundColor: colors.surface }}
-        handleIndicatorStyle={styles.indicator}
-        enablePanDownToClose={false}
-      >
-        <BottomSheetScrollView
-          contentContainerStyle={styles.sheetContent}
+      {/* Bottom panel */}
+      <View style={styles.bottomPanel}>
+        <View style={styles.handleBar} />
+        <ScrollView
+          contentContainerStyle={styles.panelContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Status label */}
-          {rideStatus === "accepted" && (
-            <Text style={[styles.statusLabel, { color: colors.primary }]}>
-              Heading to Pickup
-            </Text>
-          )}
-          {rideStatus === "arrived" && (
-            <Text style={[styles.statusLabel, { color: colors.warning }]}>
-              Waiting for Passenger
-            </Text>
-          )}
-          {rideStatus === "in_progress" && (
-            <Text style={[styles.statusLabel, { color: colors.success }]}>
-              Trip in Progress
-            </Text>
-          )}
+          {/* Status */}
+          <Text style={[styles.statusLabel, { color: statusInfo.color }]}>
+            {statusInfo.text}
+          </Text>
 
           {/* Passenger info */}
           <View style={styles.passengerRow}>
@@ -407,6 +501,8 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
             </Text>
           </View>
 
+          <View style={styles.divider} />
+
           {/* Pickup — shown before in_progress */}
           {rideStatus !== "in_progress" && (
             <View style={styles.locationRow}>
@@ -417,7 +513,7 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
             </View>
           )}
 
-          {/* Destination — always shown */}
+          {/* Destination */}
           <View style={styles.locationRow}>
             <Flag size={16} color={colors.error} />
             <Text style={styles.locationText} numberOfLines={2}>
@@ -429,11 +525,11 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
           <View style={styles.fareRow}>
             <Text style={styles.fareLabel}>Agreed fare</Text>
             <Text style={styles.fareAmount}>
-              NGN {ride.agreedFare?.toLocaleString() ?? "—"}
+              ₦{ride.agreedFare?.toLocaleString() ?? "—"}
             </Text>
           </View>
 
-          {/* Actions */}
+          {/* Action buttons */}
           <View style={styles.buttons}>
             <Button
               title="Call Passenger"
@@ -441,6 +537,7 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
               variant="outline"
               fullWidth
               disabled={!passenger?.phone}
+              icon={<Phone size={18} color={colors.primary} />}
             />
 
             {rideStatus === "accepted" && (
@@ -472,9 +569,20 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
                 loading={actionLoading}
               />
             )}
+
+            {/* Cancel — only before trip starts */}
+            {(rideStatus === "accepted" || rideStatus === "arrived") && (
+              <Button
+                title="Cancel Ride"
+                onPress={handleCancelRide}
+                variant="danger"
+                fullWidth
+                loading={actionLoading}
+              />
+            )}
           </View>
-        </BottomSheetScrollView>
-      </BottomSheet>
+        </ScrollView>
+      </View>
     </View>
   );
 }

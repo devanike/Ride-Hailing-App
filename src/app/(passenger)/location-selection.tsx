@@ -1,24 +1,25 @@
 import { Button } from "@/components/common/Button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { LocationCategoryFilter } from "@/components/common/LocationCategoryFilter";
-import { OutsideCampusModal } from "@/components/common/OutsideCampusModal";
-import { PopularLocations } from "@/components/common/PopularLocations";
 import { DropoffMarker } from "@/components/map/DropoffMarker";
-import { LocationSearch } from "@/components/map/LocationSearch";
 import { MapComponent, MapComponentRef } from "@/components/map/MapComponent";
 import { PickupMarker } from "@/components/map/PickupMarker";
-import { useCampusBoundary } from "@/hooks/useCampusBoundary";
+import { POPULAR_LOCATIONS } from "@/data/popularLocations";
 import { useLocation } from "@/hooks/useLocation";
 import { useTheme } from "@/hooks/useTheme";
-import { getAddressFromCoordinates } from "@/services/locationService";
+import { db } from "@/services/firebaseConfig";
+import {
+  calculateDistance,
+  getAddressFromCoordinates,
+} from "@/services/locationService";
+import { Collections } from "@/types/database";
 import { VehicleType } from "@/types/driver";
-import { LocationCategoryValue, PopularLocation } from "@/types/locations";
+import { PopularLocation } from "@/types/locations";
 import { Coordinates } from "@/types/map";
-import { PlaceDetails } from "@/types/places";
 import { VALIDATION } from "@/utils/constants";
-import { showError } from "@/utils/toast";
-import { router } from "expo-router";
-import { ArrowLeft, ArrowUpDown } from "lucide-react-native";
+import { showError, showSuccess } from "@/utils/toast";
+import { router, useFocusEffect } from "expo-router";
+import { collection, getDocs } from "firebase/firestore";
+import { ArrowLeft, ArrowUpDown, Navigation } from "lucide-react-native";
 import React, {
   useCallback,
   useEffect,
@@ -27,6 +28,7 @@ import React, {
   useState,
 } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -44,114 +46,197 @@ interface SelectedLocation {
   address: string;
 }
 
+type SelectionMode = "pickup" | "destination" | null;
+
 export default function LocationSelectionScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
 
   const { location: userLocation, loading: locationLoading } =
     useLocation(true);
-  const pickupBoundary = useCampusBoundary();
-  const destBoundary = useCampusBoundary();
 
   const [pickup, setPickup] = useState<SelectedLocation | null>(null);
   const [destination, setDestination] = useState<SelectedLocation | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<
-    LocationCategoryValue | "all"
-  >("all");
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>(null);
   const [proposedFare, setProposedFare] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] =
     useState<VehicleType | null>(null);
-  const [outsideModal, setOutsideModal] = useState(false);
+  const [passengerCount, setPassengerCount] = useState(1);
   const [addressLoading, setAddressLoading] = useState(false);
-
-  // Ref flag so the pre-fill effect runs only once without needing
-  // `pickup` as a dependency
   const pickupPrefilled = useRef(false);
+  const [checking, setChecking] = useState(false);
 
-  useEffect(() => {
-    if (userLocation && !pickupPrefilled.current) {
-      pickupPrefilled.current = true;
-      (async () => {
-        try {
-          setAddressLoading(true);
-          const result = await getAddressFromCoordinates(
-            userLocation.latitude,
-            userLocation.longitude,
-          );
-          setPickup({
-            coordinate: {
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-            },
-            address: result?.formattedAddress ?? "Current location",
-          });
-        } catch {
-          // silent — user can search manually
-        } finally {
-          setAddressLoading(false);
-        }
-      })();
+  // Use current location as pickup
+  const handleUseCurrentLocation = useCallback(async () => {
+    if (!userLocation) {
+      showError("Location unavailable", "Please enable location services");
+      return;
+    }
+
+    try {
+      setAddressLoading(true);
+      const result = await getAddressFromCoordinates(
+        userLocation.latitude,
+        userLocation.longitude,
+      );
+
+      let address = "Current location";
+      if (result?.formattedAddress && result.formattedAddress.length > 5) {
+        address = result.formattedAddress;
+      }
+
+      setPickup({
+        coordinate: {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+        },
+        address,
+      });
+      setSelectionMode(null);
+      showSuccess("Pickup set", "Using your current location");
+    } catch {
+      setPickup({
+        coordinate: {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+        },
+        address: "Current location",
+      });
+    } finally {
+      setAddressLoading(false);
     }
   }, [userLocation]);
 
-  // Fit map whenever both locations are available
+  useFocusEffect(
+    useCallback(() => {
+      setPickup(null);
+      setDestination(null);
+      setSelectionMode(null);
+      setProposedFare("");
+      setSelectedVehicleType(null);
+      setPassengerCount(1);
+      pickupPrefilled.current = false;
+    }, []),
+  );
+
+  // Auto-fill pickup with current location on mount
+  useEffect(() => {
+    if (userLocation && !pickupPrefilled.current) {
+      pickupPrefilled.current = true;
+      handleUseCurrentLocation();
+    }
+  }, [userLocation, handleUseCurrentLocation]);
+
+  // Fit map when both locations are set
   useEffect(() => {
     if (pickup && destination) {
       mapRef.current?.fitToCoordinates(
         [pickup.coordinate, destination.coordinate],
-        { top: 60, right: 40, bottom: 60, left: 40 },
+        { top: 100, right: 60, bottom: 200, left: 60 },
       );
     } else if (pickup) {
       mapRef.current?.animateToRegion(
-        { ...pickup.coordinate, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+        { ...pickup.coordinate, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        300,
+      );
+    } else if (destination) {
+      mapRef.current?.animateToRegion(
+        {
+          ...destination.coordinate,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
         300,
       );
     }
   }, [pickup, destination]);
 
-  const handlePickupSelect = useCallback(
-    (location: PopularLocation | PlaceDetails): void => {
-      const coordinate = location.coordinate;
-      const address =
-        "shortName" in location ? location.name : location.formattedAddress;
-
-      if (!pickupBoundary.checkLocation(coordinate)) {
-        setOutsideModal(true);
+  // Handle map tap to select location
+  const handleMapPress = useCallback(
+    async (coordinate: Coordinates) => {
+      if (!selectionMode) {
+        showError(
+          "Tap a field first",
+          "Tap on Pickup or Destination field, then tap the map",
+        );
         return;
       }
-      setPickup({ coordinate, address });
-    },
-    [pickupBoundary],
-  );
 
-  const handleDestinationSelect = useCallback(
-    (location: PopularLocation | PlaceDetails): void => {
-      const coordinate = location.coordinate;
-      const address =
-        "shortName" in location ? location.name : location.formattedAddress;
+      try {
+        setAddressLoading(true);
+        const result = await getAddressFromCoordinates(
+          coordinate.latitude,
+          coordinate.longitude,
+        );
 
-      if (!destBoundary.checkLocation(coordinate)) {
-        setOutsideModal(true);
-        return;
+        // Build a meaningful address, falling back to coordinates
+        let address = "Selected location";
+        if (result?.formattedAddress && result.formattedAddress.length > 5) {
+          address = result.formattedAddress;
+        } else {
+          address = `Location (${coordinate.latitude.toFixed(4)}, ${coordinate.longitude.toFixed(4)})`;
+        }
+
+        if (selectionMode === "pickup") {
+          setPickup({ coordinate, address });
+          showSuccess("Pickup set", address);
+        } else {
+          setDestination({ coordinate, address });
+          showSuccess("Destination set", address);
+        }
+        setSelectionMode(null);
+      } catch {
+        const address = `Location (${coordinate.latitude.toFixed(4)}, ${coordinate.longitude.toFixed(4)})`;
+        if (selectionMode === "pickup") {
+          setPickup({ coordinate, address });
+        } else {
+          setDestination({ coordinate, address });
+        }
+        setSelectionMode(null);
+      } finally {
+        setAddressLoading(false);
       }
-      setDestination({ coordinate, address });
     },
-    [destBoundary],
+    [selectionMode],
   );
 
-  const handleSwap = useCallback((): void => {
+  // Handle popular location select
+  const handlePopularSelect = useCallback(
+    (location: PopularLocation) => {
+      const target = selectionMode || "destination";
+      const selectedLoc: SelectedLocation = {
+        coordinate: location.coordinate,
+        address: location.description || location.name,
+      };
+
+      if (target === "pickup") {
+        setPickup(selectedLoc);
+        showSuccess("Pickup set", selectedLoc.address);
+      } else {
+        setDestination(selectedLoc);
+        showSuccess("Destination set", selectedLoc.address);
+      }
+      setSelectionMode(null);
+    },
+    [selectionMode],
+  );
+
+  // Swap pickup and destination
+  const handleSwap = useCallback(() => {
+    const temp = pickup;
     setPickup(destination);
-    setDestination(pickup);
+    setDestination(temp);
   }, [pickup, destination]);
 
+  // Fare validation
   const fareValue = parseFloat(proposedFare);
   const fareError: string | null =
     proposedFare.trim() === ""
       ? null
       : isNaN(fareValue) || fareValue < VALIDATION.minFare
-        ? `Minimum fare is NGN ${VALIDATION.minFare.toLocaleString()}`
+        ? `Minimum fare is ₦${VALIDATION.minFare.toLocaleString()}`
         : fareValue > VALIDATION.maxFare
-          ? `Maximum fare is NGN ${VALIDATION.maxFare.toLocaleString()}`
+          ? `Maximum fare is ₦${VALIDATION.maxFare.toLocaleString()}`
           : null;
 
   const canConfirm =
@@ -160,7 +245,8 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     proposedFare.trim() !== "" &&
     fareError === null;
 
-  const handleConfirm = useCallback((): void => {
+  // Confirm and navigate
+  const handleConfirm = useCallback(async () => {
     if (!pickup || !destination) {
       showError("Incomplete", "Please select both pickup and destination");
       return;
@@ -176,21 +262,117 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       return;
     }
 
-    router.push({
-      pathname: "/(passenger)/driver-offers",
-      params: {
-        pickupAddress: pickup.address,
-        pickupLat: pickup.coordinate.latitude.toString(),
-        pickupLng: pickup.coordinate.longitude.toString(),
-        destinationAddress: destination.address,
-        destinationLat: destination.coordinate.latitude.toString(),
-        destinationLng: destination.coordinate.longitude.toString(),
-        proposedFare: value.toString(),
-        vehicleType: selectedVehicleType ?? "",
-      },
-    });
-  }, [pickup, destination, proposedFare, selectedVehicleType]);
+    const goToOffers = (fare: number, vehicle: VehicleType | null) => {
+      if (!pickup || !destination) return;
+      router.push({
+        pathname: "/(passenger)/driver-offers",
+        params: {
+          pickupAddress: pickup.address,
+          pickupLat: pickup.coordinate.latitude.toString(),
+          pickupLng: pickup.coordinate.longitude.toString(),
+          destinationAddress: destination.address,
+          destinationLat: destination.coordinate.latitude.toString(),
+          destinationLng: destination.coordinate.longitude.toString(),
+          proposedFare: fare.toString(),
+          vehicleType: vehicle ?? "",
+          passengerCount: passengerCount.toString(),
+        },
+      });
+    };
 
+    setChecking(true);
+    try {
+      const driversSnap = await getDocs(
+        collection(db, Collections.DRIVER_LOCATIONS),
+      );
+
+      let nearbyDrivers = 0;
+      let matchingVehicle = 0;
+      const NEARBY_RADIUS_KM = 5;
+
+      const driverDocsSnap = await getDocs(collection(db, Collections.DRIVERS));
+      const driverVehicleMap: Record<string, string> = {};
+      driverDocsSnap.forEach((d) => {
+        const data = d.data();
+        if (data.vehicleType) {
+          driverVehicleMap[d.id] = data.vehicleType;
+        }
+      });
+
+      driversSnap.forEach((d) => {
+        const data = d.data();
+        if (data.isOnline !== true) return;
+
+        const dist = calculateDistance(
+          {
+            latitude: pickup.coordinate.latitude,
+            longitude: pickup.coordinate.longitude,
+          },
+          { latitude: data.latitude, longitude: data.longitude },
+        );
+
+        if (dist <= NEARBY_RADIUS_KM) {
+          nearbyDrivers++;
+
+          if (selectedVehicleType) {
+            const driverType = driverVehicleMap[d.id];
+            if (driverType === selectedVehicleType) {
+              matchingVehicle++;
+            }
+          } else {
+            matchingVehicle++;
+          }
+        }
+      });
+
+      setChecking(false);
+
+      if (nearbyDrivers === 0) {
+        Alert.alert(
+          "No Drivers Nearby",
+          "There are no online drivers within 5km of your pickup location. Would you like to proceed anyway and wait?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Wait Anyway",
+              onPress: () => goToOffers(value, selectedVehicleType),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (selectedVehicleType && matchingVehicle === 0) {
+        Alert.alert(
+          "No Matching Vehicles",
+          `There are ${nearbyDrivers} driver${nearbyDrivers > 1 ? "s" : ""} nearby, but none with a ${selectedVehicleType}. Would you like to remove the vehicle filter?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Remove Filter",
+              onPress: () => {
+                setSelectedVehicleType(null);
+                goToOffers(value, null);
+              },
+            },
+            {
+              text: "Wait Anyway",
+              onPress: () => goToOffers(value, selectedVehicleType),
+            },
+          ],
+        );
+        return;
+      }
+
+      goToOffers(value, selectedVehicleType);
+    } catch (err) {
+      console.error("Driver check error:", err);
+      setChecking(false);
+      goToOffers(value, selectedVehicleType);
+    }
+  }, [pickup, destination, proposedFare, selectedVehicleType, passengerCount]);
+
+  // Map markers
   const mapMarkers = useMemo(() => {
     const markers = [];
     if (pickup) {
@@ -224,6 +406,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
     return markers;
   }, [pickup, destination]);
 
+  // Route line
   const routeCoordinates = useMemo((): Coordinates[] => {
     if (pickup && destination) {
       return [pickup.coordinate, destination.coordinate];
@@ -232,12 +415,9 @@ export default function LocationSelectionScreen(): React.JSX.Element {
   }, [pickup, destination]);
 
   const styles = StyleSheet.create({
-    outer: {
+    container: {
       flex: 1,
       backgroundColor: colors.background,
-    },
-    safeTop: {
-      backgroundColor: colors.surface,
     },
     header: {
       flexDirection: "row",
@@ -257,8 +437,31 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       fontFamily: typography.fonts.headingSemiBold,
       color: colors.textPrimary,
     },
-    scrollContent: {
-      flexGrow: 1,
+    mapContainer: {
+      height: 280,
+      marginHorizontal: spacing.screenPadding,
+      marginTop: spacing.md,
+      borderRadius: borderRadius.lg,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    mapHint: {
+      position: "absolute",
+      top: spacing.sm,
+      left: spacing.sm,
+      right: spacing.sm,
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: borderRadius.md,
+      zIndex: 10,
+    },
+    mapHintText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.textInverse,
+      textAlign: "center",
     },
     inputsCard: {
       backgroundColor: colors.surface,
@@ -275,20 +478,45 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       alignItems: "center",
       gap: spacing.sm,
     },
-    dotPickup: {
+    dot: {
       width: 12,
       height: 12,
       borderRadius: 6,
+    },
+    dotPickup: {
       backgroundColor: colors.success,
     },
     dotDest: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
       backgroundColor: colors.error,
     },
-    searchWrapper: {
+    inputWrapper: {
       flex: 1,
+    },
+    inputTouchable: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.backgroundAlt,
+      borderRadius: borderRadius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    inputTouchableActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "10",
+    },
+    inputText: {
+      flex: 1,
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textPrimary,
+    },
+    inputPlaceholder: {
+      color: colors.textMuted,
+    },
+    currentLocationBtn: {
+      padding: spacing.xs,
     },
     dividerRow: {
       flexDirection: "row",
@@ -311,74 +539,91 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    mapPreview: {
-      marginHorizontal: spacing.screenPadding,
-      marginTop: spacing.md,
-      height: 180,
-      borderRadius: borderRadius.lg,
-      overflow: "hidden",
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    map: {
-      flex: 1,
-    },
-    popularSection: {
-      marginTop: spacing.md,
-    },
-    vehicleSection: {
+    section: {
       marginHorizontal: spacing.screenPadding,
       marginTop: spacing.md,
     },
-    vehicleSectionLabel: {
+    sectionLabel: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textPrimary,
       marginBottom: spacing.sm,
     },
-    vehicleRow: {
+    popularGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+    },
+    popularChip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    popularChipText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textPrimary,
+    },
+    optionsRow: {
       flexDirection: "row",
       gap: spacing.sm,
     },
-    vehicleOption: {
+    optionCard: {
       flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.xs,
       paddingVertical: spacing.sm,
       borderRadius: borderRadius.md,
       borderWidth: 1.5,
       borderColor: colors.border,
-      alignItems: "center",
       backgroundColor: colors.surface,
     },
-    vehicleOptionActive: {
+    optionCardActive: {
       borderColor: colors.primary,
       backgroundColor: colors.primary + "14",
     },
-    vehicleOptionText: {
+    optionText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textSecondary,
     },
-    vehicleOptionTextActive: {
+    optionTextActive: {
       color: colors.primary,
     },
-    sectionLabel: {
-      fontSize: typography.sizes.sm,
-      fontFamily: typography.fonts.bodyMedium,
-      color: colors.textMuted,
-      textTransform: "uppercase",
-      letterSpacing: 0.7,
-      marginBottom: spacing.xs,
-      paddingHorizontal: spacing.screenPadding,
+    stepperRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignSelf: "flex-start",
     },
-    fareSection: {
-      marginHorizontal: spacing.screenPadding,
-      marginTop: spacing.md,
+    stepperButton: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    fareLabel: {
-      fontSize: typography.sizes.sm,
+    stepperButtonDisabled: {
+      opacity: 0.35,
+    },
+    stepperButtonText: {
+      fontSize: typography.sizes["2xl"],
       fontFamily: typography.fonts.bodyMedium,
+      color: colors.primary,
+    },
+    stepperCount: {
+      minWidth: 40,
+      textAlign: "center",
+      fontSize: typography.sizes.lg,
+      fontFamily: typography.fonts.headingSemiBold,
       color: colors.textPrimary,
-      marginBottom: spacing.xs,
     },
     fareInputRow: {
       flexDirection: "row",
@@ -423,12 +668,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.outer}
+      style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <StatusBar barStyle="dark-content" />
 
-      <SafeAreaView style={styles.safeTop} edges={["top"]}>
+      <SafeAreaView style={{ backgroundColor: colors.surface }} edges={["top"]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -442,23 +687,64 @@ export default function LocationSelectionScreen(): React.JSX.Element {
       </SafeAreaView>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
       >
+        {/* Interactive Map */}
+        <View style={styles.mapContainer}>
+          {selectionMode && (
+            <View style={styles.mapHint}>
+              <Text style={styles.mapHintText}>
+                Tap on the map to set {selectionMode}
+              </Text>
+            </View>
+          )}
+          <MapComponent
+            ref={mapRef}
+            style={{ flex: 1 }}
+            markers={mapMarkers}
+            routeCoordinates={routeCoordinates}
+            showUserLocation
+            showsMyLocationButton={false}
+            onMapPress={handleMapPress}
+          />
+        </View>
+
         {/* Location Inputs */}
         <View style={styles.inputsCard}>
+          {/* Pickup */}
           <View style={styles.inputRow}>
-            <View style={styles.dotPickup} />
-            <View style={styles.searchWrapper}>
-              <LocationSearch
-                placeholder="Pickup location"
-                initialValue={pickup?.address ?? ""}
-                onLocationSelect={handlePickupSelect}
-              />
+            <View style={[styles.dot, styles.dotPickup]} />
+            <View style={styles.inputWrapper}>
+              <TouchableOpacity
+                style={[
+                  styles.inputTouchable,
+                  selectionMode === "pickup" && styles.inputTouchableActive,
+                ]}
+                onPress={() =>
+                  setSelectionMode(selectionMode === "pickup" ? null : "pickup")
+                }
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[styles.inputText, !pickup && styles.inputPlaceholder]}
+                  numberOfLines={1}
+                >
+                  {pickup?.address ?? "Tap to set pickup"}
+                </Text>
+              </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={styles.currentLocationBtn}
+              onPress={handleUseCurrentLocation}
+              activeOpacity={0.7}
+            >
+              <Navigation size={20} color={colors.primary} />
+            </TouchableOpacity>
           </View>
 
+          {/* Divider + Swap */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <TouchableOpacity
@@ -471,40 +757,60 @@ export default function LocationSelectionScreen(): React.JSX.Element {
             <View style={styles.dividerLine} />
           </View>
 
+          {/* Destination */}
           <View style={styles.inputRow}>
-            <View style={styles.dotDest} />
-            <View style={styles.searchWrapper}>
-              <LocationSearch
-                placeholder="Where to?"
-                initialValue={destination?.address ?? ""}
-                onLocationSelect={handleDestinationSelect}
-              />
+            <View style={[styles.dot, styles.dotDest]} />
+            <View style={styles.inputWrapper}>
+              <TouchableOpacity
+                style={[
+                  styles.inputTouchable,
+                  selectionMode === "destination" &&
+                    styles.inputTouchableActive,
+                ]}
+                onPress={() =>
+                  setSelectionMode(
+                    selectionMode === "destination" ? null : "destination",
+                  )
+                }
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.inputText,
+                    !destination && styles.inputPlaceholder,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {destination?.address ?? "Tap to set destination"}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Map Preview */}
-        <View style={styles.mapPreview}>
-          <MapComponent
-            ref={mapRef}
-            style={styles.map}
-            markers={mapMarkers}
-            routeCoordinates={routeCoordinates}
-            showUserLocation={false}
-            showsMyLocationButton={false}
-            showsCompass={false}
-            zoomEnabled={false}
-            scrollEnabled={false}
-            rotateEnabled={false}
-          />
+        {/* Quick Picks (Popular Locations) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Quick picks</Text>
+          <View style={styles.popularGrid}>
+            {POPULAR_LOCATIONS.slice(0, 8).map((loc) => (
+              <TouchableOpacity
+                key={loc.id}
+                style={styles.popularChip}
+                onPress={() => handlePopularSelect(loc)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.popularChipText}>
+                  {loc.shortName || loc.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Vehicle Type */}
-        <View style={styles.vehicleSection}>
-          <Text style={styles.vehicleSectionLabel}>
-            Vehicle type (optional)
-          </Text>
-          <View style={styles.vehicleRow}>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Vehicle type (optional)</Text>
+          <View style={styles.optionsRow}>
             {(["car", "tricycle", "bus"] as VehicleType[]).map((type) => {
               const labels: Record<VehicleType, string> = {
                 car: "Car",
@@ -515,17 +821,18 @@ export default function LocationSelectionScreen(): React.JSX.Element {
               return (
                 <TouchableOpacity
                   key={type}
-                  style={[
-                    styles.vehicleOption,
-                    active && styles.vehicleOptionActive,
-                  ]}
+                  style={[styles.optionCard, active && styles.optionCardActive]}
                   onPress={() => setSelectedVehicleType(active ? null : type)}
                   activeOpacity={0.7}
                 >
+                  {/* <Car
+                    size={16}
+                    color={active ? colors.primary : colors.textSecondary}
+                  /> */}
                   <Text
                     style={[
-                      styles.vehicleOptionText,
-                      active && styles.vehicleOptionTextActive,
+                      styles.optionText,
+                      active && styles.optionTextActive,
                     ]}
                   >
                     {labels[type]}
@@ -536,34 +843,41 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           </View>
         </View>
 
-        {/* Popular Locations */}
-        <View style={styles.popularSection}>
-          <LocationCategoryFilter
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-          />
-
-          <Text style={styles.sectionLabel}>
-            {selectedCategory === "all"
-              ? "Popular Locations"
-              : selectedCategory.charAt(0).toUpperCase() +
-                selectedCategory.slice(1)}
-          </Text>
-
-          <PopularLocations
-            onLocationSelect={handleDestinationSelect}
-            filterCategory={
-              selectedCategory !== "all" ? selectedCategory : undefined
-            }
-            enableGoogleSearch={false}
-          />
+        {/* Passengers */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Passengers</Text>
+          <View style={styles.stepperRow}>
+            <TouchableOpacity
+              style={[
+                styles.stepperButton,
+                passengerCount <= 1 && styles.stepperButtonDisabled,
+              ]}
+              onPress={() => setPassengerCount((c) => Math.max(1, c - 1))}
+              disabled={passengerCount <= 1}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.stepperButtonText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.stepperCount}>{passengerCount}</Text>
+            <TouchableOpacity
+              style={[
+                styles.stepperButton,
+                passengerCount >= 7 && styles.stepperButtonDisabled,
+              ]}
+              onPress={() => setPassengerCount((c) => Math.min(7, c + 1))}
+              disabled={passengerCount >= 7}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.stepperButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Proposed Fare */}
-        <View style={styles.fareSection}>
-          <Text style={styles.fareLabel}>Your fare offer (NGN)</Text>
+        {/* Fare */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Your fare offer (NGN)</Text>
           <View style={styles.fareInputRow}>
-            <Text style={styles.currencyLabel}>NGN</Text>
+            <Text style={styles.currencyLabel}>₦</Text>
             <TextInput
               style={styles.fareInput}
               value={proposedFare}
@@ -579,28 +893,22 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           <Text style={styles.fareHint}>
             Drivers will see this and can counter-offer
           </Text>
-          {fareError !== null && (
-            <Text style={styles.fareError}>{fareError}</Text>
-          )}
+          {fareError && <Text style={styles.fareError}>{fareError}</Text>}
         </View>
 
         {/* Confirm */}
         <View style={styles.confirmSection}>
           <Button
-            title="Continue"
+            title={checking ? "Checking availability..." : "Find Drivers"}
             onPress={handleConfirm}
             variant="primary"
             size="large"
             fullWidth
-            disabled={!canConfirm}
+            disabled={!canConfirm || checking}
+            loading={checking}
           />
         </View>
       </ScrollView>
-
-      <OutsideCampusModal
-        visible={outsideModal}
-        onClose={() => setOutsideModal(false)}
-      />
 
       {(locationLoading || addressLoading) && (
         <LoadingSpinner

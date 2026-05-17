@@ -6,6 +6,7 @@ export interface Passenger {
   phone: string;
   email: string | null;
   profilePhoto: string | null;
+  status?: "active" | "suspended";
   totalRides: number;
   pinLastChanged?: Timestamp;
   biometricEnabled?: boolean;

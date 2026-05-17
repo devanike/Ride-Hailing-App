@@ -3,6 +3,7 @@ import { PINPad } from "@/components/common/PinPad";
 import { useAuthRefresh } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
 import {
+  authenticateWithBiometric,
   enableBiometric,
   getBiometricCapability,
   markDeviceAsKnown,
@@ -98,15 +99,42 @@ export default function PINSetupScreen() {
     [firstPin, isReset, completeSetup],
   );
 
+  // const handleEnableBiometric = useCallback(async () => {
+  //   try {
+  //     await enableBiometric();
+  //     setShowBiometricModal(false);
+  //     showSuccess("Success", "Fingerprint authentication enabled");
+  //     await completeSetup();
+  //   } catch (err: any) {
+  //     console.error("Biometric enable error:", err);
+  //     showError("Error", "Failed to enable fingerprint");
+  //     setShowBiometricModal(false);
+  //     await completeSetup();
+  //   }
+  // }, [completeSetup]);
+
   const handleEnableBiometric = useCallback(async () => {
     try {
-      await enableBiometric();
-      setShowBiometricModal(false);
-      showSuccess("Success", "Fingerprint authentication enabled");
-      await completeSetup();
+      // Verify fingerprint first before enabling
+      const result = await authenticateWithBiometric();
+
+      if (result.success) {
+        await enableBiometric();
+        setShowBiometricModal(false);
+        showSuccess("Success", "Fingerprint authentication enabled");
+        await completeSetup();
+      } else {
+        showError(
+          "Failed",
+          "Fingerprint verification failed. Try again or skip.",
+        );
+      }
     } catch (err: any) {
       console.error("Biometric enable error:", err);
-      showError("Error", "Failed to enable fingerprint");
+      showError(
+        "Error",
+        "Failed to verify fingerprint. You can enable it later in settings.",
+      );
       setShowBiometricModal(false);
       await completeSetup();
     }

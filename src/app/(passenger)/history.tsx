@@ -68,6 +68,31 @@ interface RideCardProps {
   onPress: () => void;
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const { colors, typography, spacing, borderRadius } = useTheme();
+  if (status !== "cancelled") return null;
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        backgroundColor: colors.errorBackground ?? colors.error + "15",
+        borderRadius: borderRadius.sm,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: typography.sizes.xs,
+          fontFamily: typography.fonts.bodyMedium,
+          color: colors.error,
+        }}
+      >
+        Cancelled
+      </Text>
+    </View>
+  );
+}
+
 function RideCard({ ride, onPress }: RideCardProps) {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
 
@@ -169,16 +194,21 @@ function RideCard({ ride, onPress }: RideCardProps) {
 
       <View style={styles.bottomRow}>
         <Text style={styles.fareText}>
-          NGN {ride.agreedFare?.toLocaleString() ?? "—"}
+          {ride.status === "cancelled"
+            ? "Cancelled"
+            : `₦${ride.agreedFare?.toLocaleString() ?? "—"}`}
         </Text>
         <View style={styles.badgeRow}>
-          <PaymentBadge
-            method={ride.paymentMethod}
-            colors={colors}
-            typography={typography}
-            spacing={spacing}
-            borderRadius={borderRadius}
-          />
+          <StatusBadge status={ride.status} />
+          {ride.status !== "cancelled" && (
+            <PaymentBadge
+              method={ride.paymentMethod}
+              colors={colors}
+              typography={typography}
+              spacing={spacing}
+              borderRadius={borderRadius}
+            />
+          )}
         </View>
       </View>
     </TouchableOpacity>

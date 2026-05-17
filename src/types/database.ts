@@ -21,6 +21,13 @@ export interface DeviceInfo {
   lastUsed: Timestamp;
 }
 
+export interface UserSecurity {
+  pinHash: string | null;
+  pinSalt: string | null;
+  pinLastChanged: string | null;
+  updatedAt: string;
+}
+
 // COLLECTION REFERENCES
 export const Collections = {
   PASSENGERS: "passengers",
@@ -34,6 +41,7 @@ export const Collections = {
   PAYOUTS: "payouts",
   REPORTS: "reports",
   NOTIFICATIONS: "notifications",
+  USER_SECURITY: "user_security",
 } as const;
 
 export const SubCollections = {

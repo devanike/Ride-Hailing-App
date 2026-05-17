@@ -1,8 +1,9 @@
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { PINPad } from "@/components/common/PinPad";
+import { useAuthRefresh } from "@/contexts/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
-import { auth, db } from "@/services/firebaseConfig";
+import { auth } from "@/services/firebaseConfig";
 import {
   authenticateWithBiometric,
   getBiometricCapability,
@@ -10,15 +11,15 @@ import {
   hasPIN,
   isAccountLocked,
   isBiometricEnabled,
+  markDeviceAsKnown,
   resetFailedAttempts,
   trackFailedAttempt,
   verifyPIN,
 } from "@/services/securityService";
 import { showError, showSuccess } from "@/utils/toast";
 import { router } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
 import { Lock, Phone } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -31,9 +32,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-
 export default function LoginScreen() {
   const { colors, typography, spacing, borderRadius } = useTheme();
+  const { refreshAuthState } = useAuthRefresh();
 
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -45,10 +46,10 @@ export default function LoginScreen() {
   const [pinError, setPinError] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
+  const [biometricPrompted, setBiometricPrompted] = useState(false);
 
   useEffect(() => {
     checkAuthStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Countdown lockout timer
@@ -69,6 +70,12 @@ export default function LoginScreen() {
     try {
       setCheckingAuth(true);
 
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setHasPinStored(false);
+        return;
+      }
+
       const pinExists = await hasPIN();
       setHasPinStored(pinExists);
 
@@ -77,6 +84,7 @@ export default function LoginScreen() {
         if (lockStatus.isLocked) {
           setIsLocked(true);
           setLockoutTime(lockStatus.remainingTime);
+          return; // Don't prompt biometric if locked
         }
 
         const biometric = await getBiometricCapability();
@@ -84,9 +92,14 @@ export default function LoginScreen() {
           const enabled = await isBiometricEnabled();
           setBiometricEnabled(enabled);
 
-          if (enabled && !lockStatus.isLocked) {
-            handleBiometricAuth();
-          }
+          // Auto-prompt biometric if enabled and not locked
+          // if (enabled) {
+          //   setCheckingAuth(false);
+          //   setTimeout(() => {
+          //     handleBiometricAuth();
+          //   }, 300);
+          //   return;
+          // }
         }
       }
     } catch (error) {
@@ -96,43 +109,40 @@ export default function LoginScreen() {
     }
   };
 
-  const routeUser = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
-      router.replace("/(auth)/welcome");
-      return;
-    }
-
-    const [adminSnap, driverSnap, passengerSnap] = await Promise.all([
-      getDoc(doc(db, "admins", uid)),
-      getDoc(doc(db, "drivers", uid)),
-      getDoc(doc(db, "passengers", uid)),
-    ]);
-
-    if (adminSnap.exists()) {
-      router.replace("/(admin)");
-    } else if (driverSnap.exists()) {
-      router.replace("/(driver)");
-    } else if (passengerSnap.exists()) {
-      router.replace("/(passenger)");
-    } else {
-      router.replace("/(auth)/profile-setup");
-    }
-  };
-
-  const handleBiometricAuth = async () => {
+  const handleBiometricAuth = useCallback(async () => {
     try {
       const result = await authenticateWithBiometric();
       if (result.success) {
         await resetFailedAttempts();
+        await markDeviceAsKnown();
         showSuccess("Welcome Back", "Authenticated successfully");
-        await routeUser();
+        refreshAuthState();
       }
     } catch (error: any) {
       console.error("Biometric auth error:", error);
-      // Fall through to PIN
+      // User cancelled or failed - they can use PIN instead
     }
-  };
+  }, [refreshAuthState]);
+
+  useEffect(() => {
+    if (
+      !checkingAuth &&
+      hasPinStored &&
+      biometricEnabled &&
+      !isLocked &&
+      !biometricPrompted
+    ) {
+      setBiometricPrompted(true);
+      handleBiometricAuth();
+    }
+  }, [
+    checkingAuth,
+    hasPinStored,
+    biometricEnabled,
+    isLocked,
+    biometricPrompted,
+    handleBiometricAuth,
+  ]);
 
   const handlePINComplete = async (pin: string) => {
     if (isLocked) {
@@ -149,8 +159,9 @@ export default function LoginScreen() {
 
       if (isValid) {
         await resetFailedAttempts();
+        await markDeviceAsKnown();
         showSuccess("Welcome Back", "Login successful");
-        await routeUser();
+        refreshAuthState();
       } else {
         setPinError(true);
         await trackFailedAttempt();

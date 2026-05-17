@@ -5,10 +5,6 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Marker } from "react-native-maps";
 
-/**
- * Driver Marker Component
- * Displays driver location on map with online status
- */
 interface DriverMarkerProps {
   coordinate: Coordinates;
   driverId: string;

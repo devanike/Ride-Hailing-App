@@ -8,7 +8,6 @@ import { db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
 import { Driver } from "@/types/driver";
 import { Ride } from "@/types/ride";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { router, useLocalSearchParams } from "expo-router";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { Phone } from "lucide-react-native";
@@ -35,10 +34,8 @@ interface DriverLocation {
 }
 
 export default function ActiveRideScreen(): React.JSX.Element {
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["30%", "55%"], []);
 
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
 
@@ -51,7 +48,6 @@ export default function ActiveRideScreen(): React.JSX.Element {
 
   const driverFetchedRef = useRef(false);
 
-  // Listen to ride status
   useEffect(() => {
     if (!rideId) return;
 
@@ -59,7 +55,7 @@ export default function ActiveRideScreen(): React.JSX.Element {
       doc(db, Collections.RIDES, rideId),
       async (snap) => {
         if (!snap.exists()) return;
-        const rideData = snap.data() as Ride;
+        const rideData = { rideId: snap.id, ...snap.data() } as Ride;
         setRide(rideData);
 
         if (rideData.driverId && !driverFetchedRef.current) {
@@ -80,7 +76,7 @@ export default function ActiveRideScreen(): React.JSX.Element {
 
         if (rideData.status === "completed") {
           router.replace({
-            pathname: "/payment",
+            pathname: "/(passenger)/payment",
             params: { rideId },
           });
         }
@@ -94,7 +90,6 @@ export default function ActiveRideScreen(): React.JSX.Element {
     return unsub;
   }, [rideId]);
 
-  // Listen to driver location
   useEffect(() => {
     if (!ride?.driverId) return;
 
@@ -103,19 +98,17 @@ export default function ActiveRideScreen(): React.JSX.Element {
       (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
-        const loc: DriverLocation = {
+        setDriverLocation({
           latitude: data.latitude,
           longitude: data.longitude,
           isOnline: data.isOnline ?? true,
-        };
-        setDriverLocation(loc);
+        });
       },
     );
 
     return unsub;
   }, [ride?.driverId]);
 
-  // Pan map to driver as they move
   useEffect(() => {
     if (!driverLocation) return;
     mapRef.current?.animateToRegion(
@@ -146,7 +139,6 @@ export default function ActiveRideScreen(): React.JSX.Element {
     return undefined;
   }, [ride?.dropoffLocation]);
 
-  // Route polyline: driver → dropoff
   const routeCoordinates = useMemo(() => {
     if (!driverLocation || !ride?.dropoffLocation) return [];
     return [
@@ -174,19 +166,37 @@ export default function ActiveRideScreen(): React.JSX.Element {
       alignItems: "center",
       justifyContent: "center",
     },
-    sheetContent: {
-      flex: 1,
+
+    // Bottom panel
+    bottomPanel: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
       paddingHorizontal: spacing.screenPadding,
+      paddingTop: spacing.md,
       paddingBottom: spacing.xl,
+      ...shadows.large,
     },
+    handleBar: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: "center",
+      marginBottom: spacing.md,
+    },
+
     statusLabel: {
       fontSize: typography.sizes.xs,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.primary,
       textTransform: "uppercase",
       letterSpacing: 1,
-      paddingTop: spacing.xs,
-      paddingBottom: spacing.md,
+      marginBottom: spacing.md,
     },
     driverRow: {
       flexDirection: "row",
@@ -300,58 +310,50 @@ export default function ActiveRideScreen(): React.JSX.Element {
         )}
       </MapComponent>
 
-      <BottomSheet
-        ref={bottomSheetRef}
-        snapPoints={snapPoints}
-        index={0}
-        backgroundStyle={{ backgroundColor: colors.surface }}
-        handleIndicatorStyle={{ backgroundColor: colors.border }}
-        enablePanDownToClose={false}
-      >
-        <View style={styles.sheetContent}>
-          <Text style={styles.statusLabel}>Trip in Progress</Text>
+      {/* Bottom panel */}
+      <View style={styles.bottomPanel}>
+        <View style={styles.handleBar} />
 
-          <View style={styles.driverRow}>
-            {driver?.profilePhoto ? (
-              <Image
-                source={{ uri: driver.profilePhoto }}
-                style={styles.driverPhoto}
-              />
-            ) : (
-              <View style={styles.driverPhotoPlaceholder}>
-                <Text style={styles.driverInitial}>
-                  {driver?.name?.charAt(0).toUpperCase() ?? "?"}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.driverName}>
-              {driver?.name ?? "Your driver"}
-            </Text>
-          </View>
+        <Text style={styles.statusLabel}>Trip in Progress</Text>
 
-          <View style={styles.divider} />
-
-          <Text style={styles.label}>Destination</Text>
-          <Text style={styles.address} numberOfLines={2}>
-            {ride?.dropoffLocation?.address ?? "—"}
-          </Text>
-
-          <View style={styles.fareRow}>
-            <Text style={styles.fareLabel}>Agreed fare</Text>
-            <Text style={styles.fareAmount}>
-              NGN {ride?.agreedFare?.toLocaleString() ?? "—"}
-            </Text>
-          </View>
-
-          <Button
-            title="Call Driver"
-            onPress={handleCallDriver}
-            variant="outline"
-            fullWidth
-            icon={<Phone size={18} color={colors.primary} />}
-          />
+        <View style={styles.driverRow}>
+          {driver?.profilePhoto ? (
+            <Image
+              source={{ uri: driver.profilePhoto }}
+              style={styles.driverPhoto}
+            />
+          ) : (
+            <View style={styles.driverPhotoPlaceholder}>
+              <Text style={styles.driverInitial}>
+                {driver?.name?.charAt(0).toUpperCase() ?? "?"}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.driverName}>{driver?.name ?? "Your driver"}</Text>
         </View>
-      </BottomSheet>
+
+        <View style={styles.divider} />
+
+        <Text style={styles.label}>Destination</Text>
+        <Text style={styles.address} numberOfLines={2}>
+          {ride?.dropoffLocation?.address ?? "—"}
+        </Text>
+
+        <View style={styles.fareRow}>
+          <Text style={styles.fareLabel}>Agreed fare</Text>
+          <Text style={styles.fareAmount}>
+            ₦{ride?.agreedFare?.toLocaleString() ?? "—"}
+          </Text>
+        </View>
+
+        <Button
+          title="Call Driver"
+          onPress={handleCallDriver}
+          variant="outline"
+          fullWidth
+          icon={<Phone size={18} color={colors.primary} />}
+        />
+      </View>
     </View>
   );
 }

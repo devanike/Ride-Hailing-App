@@ -75,7 +75,7 @@ export default function ProfileScreen(): React.JSX.Element {
     try {
       if (unsubPassengerRef.current) unsubPassengerRef.current();
       await logout();
-      router.replace("/(auth)/welcome");
+      // router.replace("/(auth)/welcome");
     } catch (err) {
       console.error("Logout failed:", err);
       showError("Error", "Could not log out. Please try again.");

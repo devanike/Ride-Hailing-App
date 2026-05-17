@@ -2,9 +2,8 @@ import { Button } from "@/components/common/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { sendPhoneOTP, verifyOTP } from "@/services/authService";
 import { db } from "@/services/firebaseConfig";
-import { markDeviceAsKnown } from "@/services/securityService";
 import { showError, showSuccess } from "@/utils/toast";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -86,25 +85,6 @@ export default function OTPVerificationScreen() {
     }
   };
 
-  // Route user to the correct home after successful auth
-  const routeAuthenticatedUser = async (uid: string) => {
-    const [adminSnap, driverSnap, passengerSnap] = await Promise.all([
-      getDoc(doc(db, "admins", uid)),
-      getDoc(doc(db, "drivers", uid)),
-      getDoc(doc(db, "passengers", uid)),
-    ]);
-
-    if (adminSnap.exists()) {
-      router.replace("/(admin)");
-    } else if (driverSnap.exists()) {
-      router.replace("/(driver)");
-    } else if (passengerSnap.exists()) {
-      router.replace("/(passenger)");
-    } else {
-      router.replace("/(auth)/profile-setup");
-    }
-  };
-
   const handleVerify = async (code?: string) => {
     const otpCode = code || otp.join("");
 
@@ -119,25 +99,22 @@ export default function OTPVerificationScreen() {
       const userCredential = await verifyOTP(confirmationResult, otpCode);
       const uid = userCredential.user.uid;
 
-      await markDeviceAsKnown();
-
       if (isLoginMode) {
-        // Login: check Firestore to route correctly
+        // Login mode: just verify OTP, let _layout.tsx handle the rest
         showSuccess("Success", "Login successful");
-        await routeAuthenticatedUser(uid);
+        // onAuthStateChanged will fire in _layout.tsx and handle navigation
         return;
       }
 
-      // Guard: if this UID already exists in admins, do not create
-      // a passenger or driver document - route directly to admin home
+      // Signup mode: check if admin first
       const adminSnap = await getDoc(doc(db, "admins", uid));
       if (adminSnap.exists()) {
+        // Admin already exists, onAuthStateChanged handles navigation
         showSuccess("Success", "Login successful");
-        router.replace("/(admin)");
         return;
       }
 
-      // Signup: create initial document in correct collection
+      // Create initial document for new user
       if (userType === "driver") {
         await setDoc(doc(db, "drivers", uid), {
           uid,
@@ -185,12 +162,8 @@ export default function OTPVerificationScreen() {
       }
 
       showSuccess("Success", "Account verified successfully");
-
-      // Always go to profile-setup next
-      router.push({
-        pathname: "/(auth)/profile-setup",
-        params: { userType: userType ?? "passenger" },
-      });
+      // onAuthStateChanged will fire in _layout.tsx and handle navigation
+      // For signup: profile exists but no PIN → profile-setup or driver-registration or no-pin
     } catch (error: any) {
       console.error("OTP verification error:", error);
       showError("Verification Failed", "Invalid OTP code. Please try again.");

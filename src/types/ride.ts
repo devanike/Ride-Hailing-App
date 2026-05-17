@@ -38,6 +38,7 @@ export interface Ride {
   proposedFare: number;
   agreedFare: number | null;
   requiredVehicleType: VehicleType | null;
+  passengerCount: number;
   declinedBy: string[];
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus;

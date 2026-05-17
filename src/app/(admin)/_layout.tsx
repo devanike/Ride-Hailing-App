@@ -1,6 +1,6 @@
 import { useTheme } from "@/hooks/useTheme";
 import { Tabs } from "expo-router";
-import { FileText, Users, Wallet } from "lucide-react-native";
+import { FileText, Settings, Users, Wallet } from "lucide-react-native";
 import React from "react";
 
 export default function AdminLayout() {
@@ -27,7 +27,7 @@ export default function AdminLayout() {
       }}
     >
       <Tabs.Screen
-        name="reports"
+        name="index"
         options={{
           title: "Reports",
           tabBarIcon: ({ color, size }) => (
@@ -49,6 +49,18 @@ export default function AdminLayout() {
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Settings size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Hidden screens */}
+      <Tabs.Screen name="report-review" options={{ href: null }} />
     </Tabs>
   );
 }

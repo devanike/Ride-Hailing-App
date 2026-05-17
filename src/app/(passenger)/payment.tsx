@@ -1,17 +1,18 @@
 import { Button } from "@/components/common/Button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useTheme } from "@/hooks/useTheme";
-import { db } from "@/services/firebaseConfig";
+import { auth, db } from "@/services/firebaseConfig";
 import {
+  indicateCashPayment,
   recordCardPayment,
-  recordCashPayment,
 } from "@/services/paymentService";
 import { Collections } from "@/types/database";
 import { Ride } from "@/types/ride";
 import { showError, showSuccess } from "@/utils/toast";
 import { router, useLocalSearchParams } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useCallback, useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { Banknote, CreditCard } from "lucide-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   ScrollView,
@@ -20,21 +21,22 @@ import {
   Text,
   View,
 } from "react-native";
-import PaystackRaw from "react-native-paystack-webview";
+import { usePaystack } from "react-native-paystack-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const Paystack = PaystackRaw as any;
-
-const PAYSTACK_PUBLIC_KEY = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY ?? "";
 
 export default function PaymentScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
+  const { popup } = usePaystack();
 
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
   const [cashLoading, setCashLoading] = useState(false);
-  const [showPaystack, setShowPaystack] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
+  const [waitingForCash, setWaitingForCash] = useState(false);
+  const [cardFailureMessage, setCardFailureMessage] = useState("");
+
+  const navigatedRef = useRef(false);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => true);
@@ -42,65 +44,122 @@ export default function PaymentScreen(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (!rideId) return;
-    const fetchRide = async (): Promise<void> => {
-      try {
-        const snap = await getDoc(doc(db, Collections.RIDES, rideId));
-        if (snap.exists()) setRide(snap.data() as Ride);
-      } catch (err) {
-        console.error("Failed to fetch ride:", err);
-        showError("Error", "Could not load trip details.");
-      } finally {
-        setLoading(false);
+    if (!rideId) {
+      setLoading(false);
+      return;
+    }
+
+    const unsub = onSnapshot(doc(db, Collections.RIDES, rideId), (snap) => {
+      if (!snap.exists()) return;
+      const data = { rideId: snap.id, ...snap.data() } as Ride;
+      setRide(data);
+      setLoading(false);
+
+      // Check if already waiting for cash (e.g. screen re-rendered)
+      if (data.paymentMethod === "cash" && data.paymentStatus !== "completed") {
+        setWaitingForCash(true);
       }
-    };
-    fetchRide();
+
+      // Driver confirmed payment — navigate to rating
+      if (data.paymentStatus === "completed" && !navigatedRef.current) {
+        navigatedRef.current = true;
+        showSuccess("Payment confirmed", "Your driver confirmed the payment.");
+        router.replace({
+          pathname: "/rating",
+          params: {
+            rideId: rideId,
+            driverId: data.driverId ?? "",
+          },
+        } as any);
+      }
+    });
+
+    return unsub;
   }, [rideId]);
 
   const handleCashPayment = useCallback(async (): Promise<void> => {
     if (!rideId || !ride) return;
     setCashLoading(true);
+    setCardFailureMessage("");
     try {
-      await recordCashPayment(rideId);
-      showSuccess("Payment recorded", "Enjoy your trip!");
-      router.replace({
-        pathname: "/rating",
-        params: {
-          rideId,
-          driverId: ride.driverId ?? "",
-        },
-      });
+      await indicateCashPayment(rideId);
+      setWaitingForCash(true);
+      showSuccess("Cash selected", "Please hand the cash to your driver.");
     } catch (err) {
       console.error("Cash payment failed:", err);
-      showError("Error", "Could not record payment.");
+      showError("Error", "Could not update payment method.");
+    } finally {
       setCashLoading(false);
     }
   }, [rideId, ride]);
 
-  const handleCardSuccess = useCallback(
-    async (reference: string): Promise<void> => {
-      setShowPaystack(false);
-      if (!rideId || !ride) return;
-      try {
-        await recordCardPayment(rideId, reference);
-        showSuccess("Payment successful", "Thank you!");
-        router.replace({
-          pathname: "/rating",
-          params: {
-            rideId,
-            driverId: ride.driverId ?? "",
+  const handleCardPayment = useCallback(() => {
+    if (!ride?.agreedFare || !rideId) return;
+    setCardLoading(true);
+    setCardFailureMessage("");
+
+    const reference = `ride_${rideId}_${Date.now()}`;
+    const email = auth.currentUser?.email || "passenger@uiride.app";
+
+    popup.checkout({
+      email,
+      amount: ride.agreedFare,
+      reference,
+      metadata: {
+        custom_fields: [
+          {
+            display_name: "Ride ID",
+            variable_name: "ride_id",
+            value: rideId,
           },
-        });
-      } catch (err) {
-        console.error("Card payment recording failed:", err);
-        showError(
-          "Error",
-          "Payment received but could not record. Contact support.",
+        ],
+      },
+      onSuccess: async (res: any) => {
+        const ref = res?.reference ?? res?.trxref ?? reference;
+        try {
+          await recordCardPayment(rideId, ref);
+          showSuccess("Payment successful", "Thank you!");
+          setCardLoading(false);
+          navigatedRef.current = true;
+          router.replace({
+            pathname: "/rating",
+            params: {
+              rideId: rideId,
+              driverId: ride?.driverId ?? "",
+            },
+          } as any);
+        } catch (err) {
+          console.error("Card payment recording failed:", err);
+          showError("Error", "Payment received but could not record.");
+          setCardLoading(false);
+          router.replace("/(passenger)");
+        }
+      },
+      onCancel: () => {
+        setCardLoading(false);
+        setCardFailureMessage(
+          "Card payment was cancelled. You can try again or switch to cash.",
         );
-      }
-    },
-    [rideId, ride],
-  );
+      },
+      onError: (err: any) => {
+        console.error("Paystack error:", err);
+        setCardLoading(false);
+        setCardFailureMessage(
+          "Card payment failed. You can retry or switch to cash.",
+        );
+      },
+    } as any);
+  }, [ride, rideId, popup]);
+
+  const retryCardPayment = useCallback(() => {
+    setCardFailureMessage("");
+    handleCardPayment();
+  }, [handleCardPayment]);
+
+  const switchToCash = useCallback(() => {
+    setCardFailureMessage("");
+    handleCashPayment();
+  }, [handleCashPayment]);
 
   const fareDisplay = ride?.agreedFare?.toLocaleString() ?? "—";
 
@@ -121,11 +180,9 @@ export default function PaymentScreen(): React.JSX.Element {
       fontFamily: typography.fonts.heading,
       color: colors.textPrimary,
     },
-    scroll: {
-      flex: 1,
-    },
     scrollContent: {
       padding: spacing.screenPadding,
+      paddingBottom: spacing.xxl + 60,
     },
     card: {
       backgroundColor: colors.surface,
@@ -151,36 +208,48 @@ export default function PaymentScreen(): React.JSX.Element {
       backgroundColor: colors.border,
       marginBottom: spacing.lg,
     },
-    fareAmount: {
-      fontSize: typography.sizes["4xl"],
-      fontFamily: typography.fonts.heading,
-      color: colors.textPrimary,
-      textAlign: "center",
-      marginBottom: spacing.xs,
-    },
     fareCurrency: {
       fontSize: typography.sizes.lg,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textMuted,
       textAlign: "center",
+      marginBottom: spacing.xs,
+    },
+    fareAmount: {
+      fontSize: 36,
+      fontFamily: typography.fonts.heading,
+      color: colors.textPrimary,
+      textAlign: "center",
       marginBottom: spacing.lg,
     },
-    paymentMethodRow: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    paymentMethodLabel: {
-      fontSize: typography.sizes.sm,
-      fontFamily: typography.fonts.bodyRegular,
-      color: colors.textMuted,
-    },
-    cashHint: {
+    hintText: {
       fontSize: typography.sizes.sm,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
       textAlign: "center",
       marginBottom: spacing.md,
+    },
+    failureText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.error,
+      textAlign: "center",
+      marginBottom: spacing.lg,
+      paddingHorizontal: spacing.md,
+    },
+    waitingText: {
+      fontSize: typography.sizes.base,
+      fontFamily: typography.fonts.bodyMedium,
+      color: colors.primary,
+      textAlign: "center",
+      marginBottom: spacing.md,
+    },
+    waitingHint: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textMuted,
+      textAlign: "center",
+      marginBottom: spacing.lg,
     },
     actions: {
       gap: spacing.sm,
@@ -201,31 +270,8 @@ export default function PaymentScreen(): React.JSX.Element {
     );
   }
 
-  if (showPaystack && ride?.agreedFare) {
-    return (
-      <Paystack
-        paystackKey={PAYSTACK_PUBLIC_KEY}
-        amount={ride.agreedFare}
-        billingEmail="passenger@uiride.app"
-        activityIndicatorColor={colors.primary}
-        onCancel={() => setShowPaystack(false)}
-        onSuccess={(response: {
-          transactionRef?: { reference?: string };
-          data?: { reference?: string };
-        }) => {
-          const ref =
-            response?.transactionRef?.reference ??
-            response?.data?.reference ??
-            `ref_${Date.now()}`;
-          handleCardSuccess(ref);
-        }}
-        autoStart
-      />
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
@@ -233,8 +279,8 @@ export default function PaymentScreen(): React.JSX.Element {
       </View>
 
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
           <Text style={styles.locationLabel}>From</Text>
@@ -251,35 +297,66 @@ export default function PaymentScreen(): React.JSX.Element {
 
           <Text style={styles.fareCurrency}>NGN</Text>
           <Text style={styles.fareAmount}>{fareDisplay}</Text>
+        </View>
 
-          <View style={styles.paymentMethodRow}>
-            <Text style={styles.paymentMethodLabel}>
-              {ride?.paymentMethod
-                ? `Payment: ${ride.paymentMethod}`
-                : "Choose payment method"}
+        {waitingForCash ? (
+          <>
+            <Text style={styles.waitingText}>
+              Waiting for driver to confirm...
             </Text>
-          </View>
-        </View>
-
-        <Text style={styles.cashHint}>
-          Cash: hand NGN {fareDisplay} directly to your driver
-        </Text>
-
-        <View style={styles.actions}>
-          <Button
-            title={`Pay Cash  •  NGN ${fareDisplay}`}
-            onPress={handleCashPayment}
-            variant="outline"
-            fullWidth
-            loading={cashLoading}
-          />
-          <Button
-            title="Pay by Card"
-            onPress={() => setShowPaystack(true)}
-            variant="primary"
-            fullWidth
-          />
-        </View>
+            <Text style={styles.waitingHint}>
+              Please hand ₦{fareDisplay} to your driver.{"\n"}
+              This screen will update automatically once confirmed.
+            </Text>
+            <LoadingSpinner message="" />
+          </>
+        ) : cardFailureMessage ? (
+          <>
+            <Text style={styles.failureText}>{cardFailureMessage}</Text>
+            <View style={styles.actions}>
+              <Button
+                title="Try Card Again"
+                onPress={retryCardPayment}
+                variant="primary"
+                fullWidth
+                icon={<CreditCard size={18} color={colors.textInverse} />}
+              />
+              <Button
+                title="Switch to Cash"
+                onPress={switchToCash}
+                variant="outline"
+                fullWidth
+                icon={<Banknote size={18} color={colors.primary} />}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.hintText}>
+              Choose how you would like to pay
+            </Text>
+            <View style={styles.actions}>
+              <Button
+                title={`Pay Cash  •  ₦${fareDisplay}`}
+                onPress={handleCashPayment}
+                variant="outline"
+                fullWidth
+                loading={cashLoading}
+                disabled={cardLoading}
+                icon={<Banknote size={18} color={colors.primary} />}
+              />
+              <Button
+                title="Pay by Card"
+                onPress={handleCardPayment}
+                variant="primary"
+                fullWidth
+                loading={cardLoading}
+                disabled={cashLoading}
+                icon={<CreditCard size={18} color={colors.textInverse} />}
+              />
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

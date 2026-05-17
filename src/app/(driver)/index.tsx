@@ -9,8 +9,8 @@ import { calculateDistance } from "@/services/locationService";
 import { Collections, SubCollections } from "@/types/database";
 import { Driver } from "@/types/driver";
 import { Ride } from "@/types/ride";
-import { showError } from "@/utils/toast";
-import { router } from "expo-router";
+import { showError, showSuccess } from "@/utils/toast";
+import { router, useFocusEffect } from "expo-router";
 import {
   addDoc,
   arrayUnion,
@@ -40,7 +40,8 @@ const NEARBY_RADIUS_KM = 5;
 export default function DriverHomeScreen(): React.JSX.Element {
   const { colors, spacing, typography, borderRadius, shadows } = useTheme();
   const mapRef = useRef<MapComponentRef>(null);
-  const { location } = useLocation();
+
+  const { location, requestPermission, hasPermission } = useLocation(true);
 
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isOnline, setIsOnline] = useState(false);
@@ -55,6 +56,10 @@ export default function DriverHomeScreen(): React.JSX.Element {
   const rideUnsubRef = useRef<(() => void) | null>(null);
   const locationRef = useRef(location);
   const driverRef = useRef(driver);
+  const modalVisibleRef = useRef(false);
+  const bidOnRidesRef = useRef<Set<string>>(new Set());
+  // Track if we need to start listening once location arrives
+  const pendingListenUidRef = useRef<string | null>(null);
 
   useEffect(() => {
     locationRef.current = location;
@@ -63,6 +68,16 @@ export default function DriverHomeScreen(): React.JSX.Element {
   useEffect(() => {
     driverRef.current = driver;
   }, [driver]);
+
+  useEffect(() => {
+    modalVisibleRef.current = modalVisible;
+  }, [modalVisible]);
+
+  useEffect(() => {
+    if (!hasPermission) {
+      requestPermission();
+    }
+  }, [hasPermission, requestPermission]);
 
   // Load driver document
   useEffect(() => {
@@ -80,7 +95,7 @@ export default function DriverHomeScreen(): React.JSX.Element {
     return unsub;
   }, []);
 
-  // Load today's earnings summary
+  // Load today earnings summary
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -111,7 +126,7 @@ export default function DriverHomeScreen(): React.JSX.Element {
     return unsub;
   }, []);
 
-  // Start GPS writes to driverLocations
+  // Start GPS writes
   const startGPS = useCallback((uid: string) => {
     if (gpsIntervalRef.current) clearInterval(gpsIntervalRef.current);
 
@@ -157,64 +172,112 @@ export default function DriverHomeScreen(): React.JSX.Element {
 
   // Listen for nearby pending ride requests
   const startListening = useCallback((uid: string) => {
-    if (rideUnsubRef.current) rideUnsubRef.current();
+    if (rideUnsubRef.current) {
+      rideUnsubRef.current();
+      rideUnsubRef.current = null;
+    }
+
+    // If location isn't ready yet, defer
+    if (!locationRef.current) {
+      console.log("Location not ready, deferring listener start");
+      pendingListenUidRef.current = uid;
+      return;
+    }
+
+    console.log("=== Starting ride listener for uid:", uid, "===");
 
     const q = query(
       collection(db, Collections.RIDES),
       where("status", "==", "pending"),
     );
 
-    rideUnsubRef.current = onSnapshot(q, (snapshot) => {
-      const loc = locationRef.current;
-      if (!loc) return;
+    rideUnsubRef.current = onSnapshot(
+      q,
+      (snapshot) => {
+        console.log("Pending rides found:", snapshot.docs.length);
 
-      // Find first eligible ride
-      for (const docSnap of snapshot.docs) {
-        const ride = { rideId: docSnap.id, ...docSnap.data() } as Ride;
-
-        // Skip if driver already declined
-        if (ride.declinedBy?.includes(uid)) continue;
-
-        // Skip if ride already assigned
-        if (ride.driverId) continue;
-
-        // Skip if ride requires a specific vehicle type this driver doesn't have
-        if (
-          ride.requiredVehicleType &&
-          driverRef.current?.vehicleType !== ride.requiredVehicleType
-        )
-          continue;
-
-        const dist = calculateDistance(
-          { latitude: loc.latitude, longitude: loc.longitude },
-          {
-            latitude: ride.pickupLocation.latitude,
-            longitude: ride.pickupLocation.longitude,
-          },
-        );
-
-        if (dist <= NEARBY_RADIUS_KM) {
-          setPendingRide(ride);
-          setModalVisible(true);
+        const loc = locationRef.current;
+        if (!loc) {
+          console.log("No driver location in callback");
           return;
         }
-      }
-    });
+
+        if (modalVisibleRef.current) {
+          console.log("Modal already visible, skipping");
+          return;
+        }
+
+        for (const docSnap of snapshot.docs) {
+          const ride = { rideId: docSnap.id, ...docSnap.data() } as Ride;
+
+          if (ride.declinedBy?.includes(uid)) continue;
+          if (ride.driverId) continue;
+          if (bidOnRidesRef.current.has(ride.rideId)) continue;
+
+          if (
+            ride.requiredVehicleType &&
+            driverRef.current?.vehicleType !== ride.requiredVehicleType
+          )
+            continue;
+
+          const dist = calculateDistance(
+            { latitude: loc.latitude, longitude: loc.longitude },
+            {
+              latitude: ride.pickupLocation.latitude,
+              longitude: ride.pickupLocation.longitude,
+            },
+          );
+
+          console.log("Ride:", ride.rideId, "distance:", dist.toFixed(2), "km");
+
+          if (dist <= NEARBY_RADIUS_KM) {
+            console.log("✅ SHOWING ride request!");
+            setPendingRide(ride);
+            setModalVisible(true);
+            return;
+          }
+        }
+
+        console.log("No matching rides found");
+      },
+      (error) => {
+        console.error("Ride listener error:", error);
+      },
+    );
   }, []);
+
+  // If location arrives and we have a pending listen request, start it
+  useEffect(() => {
+    if (location && pendingListenUidRef.current) {
+      const uid = pendingListenUidRef.current;
+      pendingListenUidRef.current = null;
+      console.log("Location arrived, starting deferred listener for:", uid);
+      startListening(uid);
+    }
+  }, [location, startListening]);
 
   const stopListening = useCallback(() => {
     if (rideUnsubRef.current) {
       rideUnsubRef.current();
       rideUnsubRef.current = null;
     }
+    pendingListenUidRef.current = null;
     setPendingRide(null);
     setModalVisible(false);
   }, []);
 
-  // Toggle online/offline
+  // Toggle online / offline
   const handleToggleOnline = useCallback(async () => {
     const uid = auth.currentUser?.uid;
     if (!uid || toggling) return;
+
+    if (!isOnline && !locationRef.current) {
+      showError(
+        "Location needed",
+        "Waiting for your location. Please try again in a moment.",
+      );
+      return;
+    }
 
     setToggling(true);
     try {
@@ -225,11 +288,13 @@ export default function DriverHomeScreen(): React.JSX.Element {
       });
 
       if (next) {
+        bidOnRidesRef.current.clear();
         startGPS(uid);
         startListening(uid);
       } else {
         await stopGPS(uid);
         stopListening();
+        bidOnRidesRef.current.clear();
       }
 
       setIsOnline(next);
@@ -264,14 +329,14 @@ export default function DriverHomeScreen(): React.JSX.Element {
     }
   }, [location]);
 
-  // Ride request handlers
+  // Accept the passenger's proposed fare directly
   const handleAccept = useCallback(
     async (fare: number) => {
       const uid = auth.currentUser?.uid;
       if (!pendingRide || !uid) return;
 
       setModalVisible(false);
-      stopListening();
+      setPendingRide(null);
 
       try {
         await updateDoc(doc(db, Collections.RIDES, pendingRide.rideId), {
@@ -300,12 +365,12 @@ export default function DriverHomeScreen(): React.JSX.Element {
       } catch (err) {
         showError("Error", "Failed to accept ride");
         console.error("Accept ride error:", err);
-        if (uid) startListening(uid);
       }
     },
-    [pendingRide, stopListening, startListening],
+    [pendingRide],
   );
 
+  // Submit a counter-bid
   const handleBid = useCallback(
     async (amount: number) => {
       const uid = auth.currentUser?.uid;
@@ -341,8 +406,12 @@ export default function DriverHomeScreen(): React.JSX.Element {
           createdAt: serverTimestamp(),
         });
 
+        bidOnRidesRef.current.add(pendingRide.rideId);
         setPendingRide(null);
-        // Keep listening for other requests
+        showSuccess(
+          "Bid Sent",
+          `Your counter-offer of ₦${amount.toLocaleString()} has been sent.`,
+        );
       } catch (err) {
         showError("Error", "Failed to submit bid");
         console.error("Submit bid error:", err);
@@ -351,6 +420,7 @@ export default function DriverHomeScreen(): React.JSX.Element {
     [pendingRide],
   );
 
+  // Decline the ride request
   const handleDecline = useCallback(async () => {
     const uid = auth.currentUser?.uid;
     if (!pendingRide || !uid) return;
@@ -367,6 +437,54 @@ export default function DriverHomeScreen(): React.JSX.Element {
       console.error("Decline ride error:", err);
     }
   }, [pendingRide]);
+
+  // Check for existing active ride on mount
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const q = query(
+      collection(db, Collections.RIDES),
+      where("driverId", "==", uid),
+      where("status", "in", ["accepted", "arrived", "in_progress"]),
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const activeRides = snapshot.docs
+          .map((d) => ({ rideId: d.id, ...d.data() }) as Ride)
+          .filter((r) => {
+            if (r.paymentStatus === "completed") return false;
+            if (r.completedAt) return false;
+            if (r.cancelledAt) return false;
+            return true;
+          });
+
+        if (activeRides.length > 0) {
+          router.push({
+            pathname: "/(driver)/active-ride",
+            params: { rideId: activeRides[0].rideId },
+          });
+        }
+      }
+    });
+
+    return unsub;
+  }, []);
+
+  // Restart ride listener when screen regains focus and driver is online
+  useFocusEffect(
+    useCallback(() => {
+      const uid = auth.currentUser?.uid;
+      if (!uid || !isOnline) return;
+
+      bidOnRidesRef.current.clear();
+      console.log("Screen focused, clearing bid history");
+
+      // Start listening — if location isn't ready, startListening will defer
+      startListening(uid);
+    }, [isOnline, startListening]),
+  );
 
   const isActive = driver?.status === "active";
 
@@ -504,7 +622,6 @@ export default function DriverHomeScreen(): React.JSX.Element {
             </View>
           </View>
 
-          {/* Incomplete registration banner */}
           {!isActive && (
             <View style={styles.banner}>
               <Text style={styles.bannerText}>
@@ -521,7 +638,29 @@ export default function DriverHomeScreen(): React.JSX.Element {
         </SafeAreaView>
       </View>
 
-      {/* Ride request modal */}
+      {driver?.status === "suspended" && (
+        <View
+          style={{
+            marginHorizontal: spacing.md,
+            marginTop: spacing.sm,
+            backgroundColor: colors.error,
+            borderRadius: borderRadius.md,
+            padding: spacing.md,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: typography.sizes.sm,
+              fontFamily: typography.fonts.bodyMedium,
+              color: colors.textInverse,
+              textAlign: "center",
+            }}
+          >
+            Your account has been suspended. Contact support for assistance.
+          </Text>
+        </View>
+      )}
+
       {pendingRide && (
         <RideRequestModal
           ride={pendingRide}
