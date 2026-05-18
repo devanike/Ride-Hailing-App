@@ -376,6 +376,7 @@ export default function BookingConfirmationScreen(): React.JSX.Element {
         showUserLocation={false}
         showsMyLocationButton={false}
         initialRegion={mapInitialRegion}
+        // routeCoordinates={routeCoordinates}
       >
         {ride?.pickupLocation && (
           <PickupMarker

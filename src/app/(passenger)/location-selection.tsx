@@ -69,7 +69,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
   // Use current location as pickup
   const handleUseCurrentLocation = useCallback(async () => {
     if (!userLocation) {
-      showError("Location unavailable", "Please enable location services");
+      // showError("Location unavailable", "Please enable location services");
       return;
     }
 
@@ -93,7 +93,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         address,
       });
       setSelectionMode(null);
-      showSuccess("Pickup set", "Using your current location");
+      // showSuccess("Pickup set", "Using your current location");
     } catch {
       setPickup({
         coordinate: {
@@ -121,11 +121,15 @@ export default function LocationSelectionScreen(): React.JSX.Element {
 
   // Auto-fill pickup with current location on mount
   useEffect(() => {
-    if (userLocation && !pickupPrefilled.current) {
+    if (userLocation && !pickupPrefilled.current && !locationLoading) {
       pickupPrefilled.current = true;
-      handleUseCurrentLocation();
+      // Small delay to ensure location is stable
+      const timer = setTimeout(() => {
+        handleUseCurrentLocation();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [userLocation, handleUseCurrentLocation]);
+  }, [userLocation, locationLoading, handleUseCurrentLocation]);
 
   // Fit map when both locations are set
   useEffect(() => {
@@ -407,12 +411,12 @@ export default function LocationSelectionScreen(): React.JSX.Element {
   }, [pickup, destination]);
 
   // Route line
-  const routeCoordinates = useMemo((): Coordinates[] => {
-    if (pickup && destination) {
-      return [pickup.coordinate, destination.coordinate];
-    }
-    return [];
-  }, [pickup, destination]);
+  // const routeCoordinates = useMemo((): Coordinates[] => {
+  //   if (pickup && destination) {
+  //     return [pickup.coordinate, destination.coordinate];
+  //   }
+  //   return [];
+  // }, [pickup, destination]);
 
   const styles = StyleSheet.create({
     container: {
@@ -704,7 +708,7 @@ export default function LocationSelectionScreen(): React.JSX.Element {
             ref={mapRef}
             style={{ flex: 1 }}
             markers={mapMarkers}
-            routeCoordinates={routeCoordinates}
+            // routeCoordinates={routeCoordinates}
             showUserLocation
             showsMyLocationButton={false}
             onMapPress={handleMapPress}

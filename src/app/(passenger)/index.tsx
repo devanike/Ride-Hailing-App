@@ -135,20 +135,26 @@ export default function PassengerHomeScreen(): React.JSX.Element {
 
     const unsub = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
-        const now = Date.now();
-        const thirtyMinMs = 30 * 60 * 1000;
+        // const now = Date.now();
+        // const thirtyMinMs = 30 * 60 * 1000;
 
         const activeRides = snapshot.docs
           .map((d) => ({ rideId: d.id, ...d.data() }) as Ride)
           .filter((r) => {
+            // Only show rides created in the last 30 minutes that are truly active
             if (r.paymentStatus === "completed") return false;
             if (r.completedAt) return false;
             if (r.cancelledAt) return false;
-            // Stale pending rides older than 30 minutes
-            if (r.status === "pending") {
-              const created = r.createdAt?.toMillis?.() ?? 0;
-              if (now - created > thirtyMinMs) return false;
-            }
+            if (r.status === "cancelled") return false;
+
+            const createdAt = r.createdAt?.toMillis?.() ?? 0;
+            const now = Date.now();
+            const thirtyMinMs = 30 * 60 * 1000;
+
+            // Stale pending rides
+            if (r.status === "pending" && now - createdAt > thirtyMinMs)
+              return false;
+
             return true;
           })
           .sort((a, b) => {

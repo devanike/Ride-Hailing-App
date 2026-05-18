@@ -8,6 +8,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   increment,
   query,
@@ -175,11 +176,38 @@ export const getPaymentByRideId = async (rideId: string): Promise<Payment> => {
 };
 
 // Kept for backwards compatibility with existing screens
+export const recordCashPayment = async (rideId: string): Promise<void> => {
+  try {
+    const rideSnap = await getDoc(doc(db, Collections.RIDES, rideId));
+    const rideData = rideSnap.exists() ? rideSnap.data() : null;
+
+    await updateDoc(doc(db, Collections.RIDES, rideId), {
+      paymentStatus: "completed",
+      paymentMethod: "cash",
+      paidAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    if (rideData?.passengerId) {
+      await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
+        totalRides: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (error: any) {
+    console.error("Error recording cash payment:", error);
+    throw new Error("Failed to record payment");
+  }
+};
+
 export const recordCardPayment = async (
   rideId: string,
   reference: string,
 ): Promise<void> => {
   try {
+    const rideSnap = await getDoc(doc(db, Collections.RIDES, rideId));
+    const rideData = rideSnap.exists() ? rideSnap.data() : null;
+
     await updateDoc(doc(db, Collections.RIDES, rideId), {
       paymentStatus: "completed",
       paymentMethod: "card",
@@ -187,22 +215,15 @@ export const recordCardPayment = async (
       paidAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    if (rideData?.passengerId) {
+      await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
+        totalRides: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+    }
   } catch (error: any) {
     console.error("Error recording card payment:", error);
-    throw new Error("Failed to record payment");
-  }
-};
-
-export const recordCashPayment = async (rideId: string): Promise<void> => {
-  try {
-    await updateDoc(doc(db, Collections.RIDES, rideId), {
-      paymentStatus: "completed",
-      paymentMethod: "cash",
-      paidAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error: any) {
-    console.error("Error recording cash payment:", error);
     throw new Error("Failed to record payment");
   }
 };

@@ -11,10 +11,7 @@ import {
 import { auth } from "./firebaseConfig";
 import { clearAllSecurityData } from "./securityService";
 
-// Auth Service - Handles Firebase Authentication with Phone Number
-
-// Simple verifier for React Native
-// Firebase will use test numbers if configured in Firebase Console
+// Simple verifier for test phone auth in React Native
 class InvisibleVerifier implements ApplicationVerifier {
   type = "recaptcha" as const;
 
@@ -33,8 +30,6 @@ class InvisibleVerifier implements ApplicationVerifier {
 
 const verifier = new InvisibleVerifier();
 
-// Send OTP to phone number
-// Works with test phone numbers configured in Firebase Console
 export const sendPhoneOTP = async (
   phoneNumber: string,
 ): Promise<ConfirmationResult> => {
@@ -69,12 +64,14 @@ export const sendPhoneOTP = async (
   }
 };
 
-// Verify OTP code
 export const verifyOTP = async (
   confirmationResult: ConfirmationResult,
   code: string,
 ): Promise<UserCredential> => {
   try {
+    if (!confirmationResult) {
+      throw new Error("No verification session. Please request a new OTP.");
+    }
     const userCredential = await confirmationResult.confirm(code);
     return userCredential;
   } catch (error: any) {
@@ -83,18 +80,13 @@ export const verifyOTP = async (
   }
 };
 
-// Get current authenticated user
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
 };
 
-// Logout current user
 export const logout = async (): Promise<void> => {
   try {
-    // Clear all security data (PIN, biometric, known devices, etc.)
     await clearAllSecurityData();
-
-    // Then sign out from Firebase
     await signOut(auth);
   } catch (error: any) {
     console.error("Error logging out:", error);
@@ -102,7 +94,6 @@ export const logout = async (): Promise<void> => {
   }
 };
 
-// Listen to auth state changes
 export const onAuthStateChanged = (
   callback: (user: User | null) => void,
 ): Unsubscribe => {

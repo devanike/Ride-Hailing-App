@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -11,6 +10,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "uirideapp",
   userInterfaceStyle: "light",
   newArchEnabled: true,
+  runtimeVersion: "1.0.0",
+  updates: {
+    url: "https://u.expo.dev/8cb5721f-8bf8-42ee-ab7d-3f3218186f23",
+  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.graceolabode.uirideapp",
@@ -27,7 +30,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "UI-Ride needs your location to track your ride even when the app is in the background.",
     },
     config: {
-      // The ?? "" prevents TypeScript errors if the variable is missing
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
     },
   },
@@ -38,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: "./assets/images/icon.png",
     },
     permissions: [
+      "INTERNET",
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
       "CAMERA",
@@ -92,11 +95,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
   ],
-  experiments: {
-    typedRoutes: true,
-    reactCompiler: true,
-  },
-
   extra: {
     eas: {
       projectId: "8cb5721f-8bf8-42ee-ab7d-3f3218186f23",

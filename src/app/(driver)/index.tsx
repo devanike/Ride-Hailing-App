@@ -358,6 +358,8 @@ export default function DriverHomeScreen(): React.JSX.Element {
           createdAt: serverTimestamp(),
         });
 
+        bidOnRidesRef.current.clear();
+
         router.push({
           pathname: "/(driver)/active-ride",
           params: { rideId: pendingRide.rideId },
@@ -370,7 +372,6 @@ export default function DriverHomeScreen(): React.JSX.Element {
     [pendingRide],
   );
 
-  // Submit a counter-bid
   const handleBid = useCallback(
     async (amount: number) => {
       const uid = auth.currentUser?.uid;
@@ -436,7 +437,9 @@ export default function DriverHomeScreen(): React.JSX.Element {
     } catch (err) {
       console.error("Decline ride error:", err);
     }
-  }, [pendingRide]);
+
+    startListening(uid);
+  }, [pendingRide, startListening]);
 
   // Check for existing active ride on mount
   useEffect(() => {

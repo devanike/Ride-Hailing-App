@@ -139,19 +139,19 @@ export default function ActiveRideScreen(): React.JSX.Element {
     return undefined;
   }, [ride?.dropoffLocation]);
 
-  const routeCoordinates = useMemo(() => {
-    if (!driverLocation || !ride?.dropoffLocation) return [];
-    return [
-      {
-        latitude: driverLocation.latitude,
-        longitude: driverLocation.longitude,
-      },
-      {
-        latitude: ride.dropoffLocation.latitude,
-        longitude: ride.dropoffLocation.longitude,
-      },
-    ];
-  }, [driverLocation, ride?.dropoffLocation]);
+  // const routeCoordinates = useMemo(() => {
+  //   if (!driverLocation || !ride?.dropoffLocation) return [];
+  //   return [
+  //     {
+  //       latitude: driverLocation.latitude,
+  //       longitude: driverLocation.longitude,
+  //     },
+  //     {
+  //       latitude: ride.dropoffLocation.latitude,
+  //       longitude: ride.dropoffLocation.longitude,
+  //     },
+  //   ];
+  // }, [driverLocation, ride?.dropoffLocation]);
 
   const styles = StyleSheet.create({
     container: {
@@ -286,7 +286,7 @@ export default function ActiveRideScreen(): React.JSX.Element {
         showUserLocation={false}
         showsMyLocationButton={false}
         initialRegion={mapInitialRegion}
-        routeCoordinates={routeCoordinates}
+        // routeCoordinates={routeCoordinates}
       >
         {ride?.dropoffLocation && (
           <DropoffMarker

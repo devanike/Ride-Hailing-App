@@ -10,7 +10,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   onSnapshot,
-  orderBy,
+  // orderBy,
   query,
   where,
 } from "firebase/firestore";
@@ -171,6 +171,34 @@ export default function MyReportsScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterValue>("all");
 
+  // useEffect(() => {
+  //   const unsub = onAuthStateChanged(auth, (user) => {
+  //     if (!user) {
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     const q = query(
+  //       collection(db, Collections.REPORTS),
+  //       where("reporterId", "==", user.uid),
+  //       orderBy("createdAt", "desc"),
+  //     );
+
+  //     const unsubReports = onSnapshot(q, (snap) => {
+  //       const data = snap.docs.map((d) => ({
+  //         reportId: d.id,
+  //         ...d.data(),
+  //       })) as Report[];
+  //       setReports(data);
+  //       setLoading(false);
+  //     });
+
+  //     return () => unsubReports();
+  //   });
+
+  //   return unsub;
+  // }, []);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -181,17 +209,30 @@ export default function MyReportsScreen(): React.JSX.Element {
       const q = query(
         collection(db, Collections.REPORTS),
         where("reporterId", "==", user.uid),
-        orderBy("createdAt", "desc"),
       );
 
-      const unsubReports = onSnapshot(q, (snap) => {
-        const data = snap.docs.map((d) => ({
-          reportId: d.id,
-          ...d.data(),
-        })) as Report[];
-        setReports(data);
-        setLoading(false);
-      });
+      const unsubReports = onSnapshot(
+        q,
+        (snap) => {
+          const data = snap.docs.map((d) => ({
+            reportId: d.id,
+            ...d.data(),
+          })) as Report[];
+
+          data.sort(
+            (a, b) =>
+              (b.createdAt?.toMillis?.() ?? 0) -
+              (a.createdAt?.toMillis?.() ?? 0),
+          );
+
+          setReports(data);
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Reports listener error:", error);
+          setLoading(false);
+        },
+      );
 
       return () => unsubReports();
     });

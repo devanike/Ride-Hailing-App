@@ -18,6 +18,9 @@ import {
   ViewToken,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SvgProps } from "react-native-svg";
+import Onboarding1 from "../../../assets/illustrations/onboarding-1.svg";
+import Onboarding2 from "../../../assets/illustrations/onboarding-2.svg";
 
 const { width } = Dimensions.get("window");
 
@@ -25,7 +28,7 @@ interface OnboardingSlide {
   id: string;
   title: string;
   description: string;
-  // image: ImageSourcePropType;
+  image: React.FC<SvgProps>;
 }
 
 interface ViewableItemsChanged {
@@ -38,14 +41,14 @@ const slides: readonly OnboardingSlide[] = [
     id: "1",
     title: "Find Your Ride",
     description: "Connect with verified drivers across UI campus in seconds",
-    // image: require("../../../assets/illustrations/onboarding-1.png"),
+    image: Onboarding1,
   },
   {
     id: "2",
     title: "Track in Real-Time",
     description:
       "Know exactly where your driver is and get accurate arrival times",
-    // image: require("../../../assets/illustrations/onboarding-2.png"),
+    image: Onboarding2,
   },
 ] as const;
 
@@ -153,9 +156,15 @@ export default function OnboardingScreen(): React.JSX.Element {
         },
       });
 
+      const ImageComponent = item.image;
+
       return (
         <View style={styles.slide}>
-          {/* <Image source={item.image} style={styles.illustration} /> */}
+          <ImageComponent
+            width={Math.min(width * 0.75, 280)}
+            height={Math.min(width * 0.75, 280)}
+            style={styles.illustration}
+          />
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.description}>{item.description}</Text>
         </View>

@@ -236,8 +236,8 @@ export default function DriverActiveRideScreen(): React.JSX.Element {
     try {
       await updateDoc(doc(db, Collections.RIDES, rideId), {
         status: "cancelled",
-        driverId: null,
-        agreedFare: null,
+        // driverId: null,
+        // agreedFare: null,
         cancelledAt: serverTimestamp(),
         cancelledBy: auth.currentUser?.uid ?? null,
         cancellationReason: "Driver cancelled the ride",
