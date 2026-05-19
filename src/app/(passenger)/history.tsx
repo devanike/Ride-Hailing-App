@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/common/EmptyState";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useTheme } from "@/hooks/useTheme";
 import { auth, db } from "@/services/firebaseConfig";
 import { Collections } from "@/types/database";
@@ -283,7 +284,9 @@ export default function HistoryScreen(): React.JSX.Element {
         <Text style={styles.title}>Ride History</Text>
       </View>
 
-      {!loading && rides.length === 0 ? (
+      {loading ? (
+        <LoadingSpinner message="Loading ride history..." />
+      ) : rides.length === 0 ? (
         <EmptyState
           icon={<Clock size={64} color={colors.textMuted} />}
           title="No Rides Yet"

@@ -166,7 +166,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       marginBottom: 2,
     },
     infoValue: {
-      fontSize: typography.sizes.md,
+      fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyMedium,
       color: colors.textPrimary,
       flex: 1,
@@ -180,7 +180,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       borderBottomColor: colors.border,
     },
     fareLabel: {
-      fontSize: typography.sizes.md,
+      fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
     },
@@ -198,7 +198,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       borderBottomColor: colors.border,
     },
     passengerCountLabel: {
-      fontSize: typography.sizes.md,
+      fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
     },
@@ -216,7 +216,7 @@ export const RideRequestModal: React.FC<RideRequestModalProps> = ({
       borderBottomColor: colors.border,
     },
     vehicleTypeLabel: {
-      fontSize: typography.sizes.md,
+      fontSize: typography.sizes.base,
       fontFamily: typography.fonts.bodyRegular,
       color: colors.textSecondary,
     },

@@ -216,9 +216,13 @@ function RootLayoutInner() {
 
   useEffect(() => {
     if (authState !== "loading") {
-      SplashScreen.hideAsync().catch((err) =>
-        console.warn("Failed to hide splash screen:", err),
-      );
+      // Delay splash screen hide to let navigation settle
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch((err) =>
+          console.warn("Failed to hide splash screen:", err),
+        );
+      }, 200);
+      return () => clearTimeout(timer);
     }
   }, [authState]);
 
@@ -315,7 +319,9 @@ function RootLayoutInner() {
 
       if (currentPath !== targetPath) {
         console.log("Navigating to:", targetRoute);
-        router.replace(targetRoute as any);
+        setTimeout(() => {
+          router.replace(targetRoute as any);
+        }, 50);
       }
     }
   }, [authState, userType, segments, router]);

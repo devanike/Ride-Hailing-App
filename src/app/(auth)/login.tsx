@@ -408,7 +408,7 @@ export default function LoginScreen() {
 
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
+                <Text style={styles.dividerText}>OR LOG IN WITH PHONE</Text>
                 <View style={styles.dividerLine} />
               </View>
 

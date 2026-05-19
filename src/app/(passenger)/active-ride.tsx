@@ -346,13 +346,15 @@ export default function ActiveRideScreen(): React.JSX.Element {
           </Text>
         </View>
 
-        <Button
-          title="Call Driver"
-          onPress={handleCallDriver}
-          variant="outline"
-          fullWidth
-          icon={<Phone size={18} color={colors.primary} />}
-        />
+        {ride?.status !== "in_progress" && (
+          <Button
+            title="Call Driver"
+            onPress={handleCallDriver}
+            variant="outline"
+            fullWidth
+            icon={<Phone size={18} color={colors.primary} />}
+          />
+        )}
       </View>
     </View>
   );

@@ -84,6 +84,13 @@ export default function WelcomeScreen() {
     buttonsContainer: {
       gap: spacing.md,
     },
+    helperText: {
+      fontSize: typography.sizes.sm,
+      fontFamily: typography.fonts.bodyRegular,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: spacing.xs,
+    },
   });
 
   return (
@@ -103,9 +110,27 @@ export default function WelcomeScreen() {
             <View style={styles.logoIcon}>
               <Car size={20} color={colors.textInverse} />
             </View>
-            <Text style={styles.appName}>UICampusCab</Text>
+            <Text style={styles.appName}>UI Ride</Text>
           </View>
           <Text style={styles.tagline}>Campus Rides Made Simple</Text>
+        </View>
+
+        {/* Description */}
+        <View style={styles.middleSection}>
+          <Text
+            style={{
+              fontSize: typography.sizes.base,
+              fontFamily: typography.fonts.bodyRegular,
+              color: colors.textSecondary,
+              textAlign: "center",
+              lineHeight: typography.sizes.base * 1.6,
+              paddingHorizontal: spacing.lg,
+            }}
+          >
+            Request rides, negotiate fares, and travel safely across the
+            University of Ibadan campus. Connect with verified drivers in
+            seconds.
+          </Text>
         </View>
 
         {/* Middle Section - Main Illustration (Image 1) */}
@@ -119,6 +144,10 @@ export default function WelcomeScreen() {
         {/* Bottom Section - Action Buttons */}
         <View style={styles.bottomSection}>
           <View style={styles.buttonsContainer}>
+            <Text style={styles.helperText}>
+              If you do not have an account, click Get Started to create one.
+            </Text>
+
             <Button
               title="Get Started"
               onPress={() => router.push("/(auth)/signup")}

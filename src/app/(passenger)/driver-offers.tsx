@@ -12,7 +12,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   addDoc,
-  arrayUnion,
+  // arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -558,10 +558,10 @@ export default function DriverOffersScreen(): React.JSX.Element {
         );
 
         // Add driver to declinedBy so they don't see this ride again
-        await updateDoc(doc(db, Collections.RIDES, rideId), {
-          declinedBy: arrayUnion(bid.driverId),
-          updatedAt: serverTimestamp(),
-        });
+        // await updateDoc(doc(db, Collections.RIDES, rideId), {
+        //   declinedBy: arrayUnion(bid.driverId),
+        //   updatedAt: serverTimestamp(),
+        // });
 
         // Remove from local state
         setBids((prev) => prev.filter((b) => b.bidId !== bid.bidId));

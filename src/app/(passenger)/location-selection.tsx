@@ -166,6 +166,18 @@ export default function LocationSelectionScreen(): React.JSX.Element {
         return;
       }
 
+      const mode = selectionMode;
+      const tempAddress = `${coordinate.latitude.toFixed(5)}, ${coordinate.longitude.toFixed(5)}`;
+
+      // Set immediately
+      if (mode === "pickup") {
+        setPickup({ coordinate, address: tempAddress });
+      } else {
+        setDestination({ coordinate, address: tempAddress });
+      }
+      setSelectionMode(null);
+
+      // Resolve address in background
       try {
         setAddressLoading(true);
         const result = await getAddressFromCoordinates(
@@ -173,30 +185,21 @@ export default function LocationSelectionScreen(): React.JSX.Element {
           coordinate.longitude,
         );
 
-        // Build a meaningful address, falling back to coordinates
-        let address = "Selected location";
-        if (result?.formattedAddress && result.formattedAddress.length > 5) {
+        let address = tempAddress;
+        if (
+          result?.formattedAddress &&
+          result.formattedAddress.trim().length > 3
+        ) {
           address = result.formattedAddress;
-        } else {
-          address = `Location (${coordinate.latitude.toFixed(4)}, ${coordinate.longitude.toFixed(4)})`;
         }
 
-        if (selectionMode === "pickup") {
+        if (mode === "pickup") {
           setPickup({ coordinate, address });
-          showSuccess("Pickup set", address);
         } else {
           setDestination({ coordinate, address });
-          showSuccess("Destination set", address);
         }
-        setSelectionMode(null);
       } catch {
-        const address = `Location (${coordinate.latitude.toFixed(4)}, ${coordinate.longitude.toFixed(4)})`;
-        if (selectionMode === "pickup") {
-          setPickup({ coordinate, address });
-        } else {
-          setDestination({ coordinate, address });
-        }
-        setSelectionMode(null);
+        // Keep coordinate-based address
       } finally {
         setAddressLoading(false);
       }

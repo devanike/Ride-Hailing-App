@@ -240,9 +240,10 @@ export const authenticateWithBiometric =
   async (): Promise<AuthenticationResult> => {
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Authenticate to continue",
+        promptMessage: "Scan your fingerprint to continue",
         fallbackLabel: "Use PIN",
         cancelLabel: "Cancel",
+        disableDeviceFallback: false,
       });
       return {
         success: result.success,

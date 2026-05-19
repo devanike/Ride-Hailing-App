@@ -133,22 +133,30 @@ export const recordDriverEarning = async (
 ): Promise<void> => {
   try {
     const earningRef = doc(db, Collections.EARNINGS, `${rideId}_earning`);
-    await setDoc(earningRef, {
-      rideId,
-      driverId,
-      amount,
-      paymentMethod: method,
-      payoutStatus: method === "cash" ? "completed" : "pending",
-      payoutId: null,
-      payoutDate: null,
-      createdAt: serverTimestamp(),
-    });
+    await setDoc(
+      earningRef,
+      {
+        rideId,
+        driverId,
+        amount,
+        paymentMethod: method,
+        payoutStatus: method === "cash" ? "completed" : "pending",
+        payoutId: null,
+        payoutDate: null,
+        createdAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
 
-    await updateDoc(doc(db, Collections.DRIVERS, driverId), {
-      totalEarnings: increment(amount),
-      completedRides: increment(1),
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await updateDoc(doc(db, Collections.DRIVERS, driverId), {
+        totalEarnings: increment(amount),
+        completedRides: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (driverErr) {
+      console.error("Error updating driver earnings:", driverErr);
+    }
   } catch (error: any) {
     console.error("Error recording driver earning:", error);
     throw new Error("Failed to record earning");
@@ -181,6 +189,7 @@ export const recordCashPayment = async (rideId: string): Promise<void> => {
     const rideSnap = await getDoc(doc(db, Collections.RIDES, rideId));
     const rideData = rideSnap.exists() ? rideSnap.data() : null;
 
+    // Update ride status
     await updateDoc(doc(db, Collections.RIDES, rideId), {
       paymentStatus: "completed",
       paymentMethod: "cash",
@@ -188,11 +197,36 @@ export const recordCashPayment = async (rideId: string): Promise<void> => {
       updatedAt: serverTimestamp(),
     });
 
+    // Create payment document
+    if (rideData) {
+      try {
+        await addDoc(collection(db, Collections.PAYMENTS), {
+          rideId,
+          passengerId: rideData.passengerId ?? null,
+          driverId: rideData.driverId ?? null,
+          amount: rideData.agreedFare ?? 0,
+          paymentMethod: "cash",
+          status: "completed",
+          reference: null,
+          paidAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (payErr) {
+        console.error("Error creating payment document:", payErr);
+      }
+    }
+
+    // Increment passenger total rides
     if (rideData?.passengerId) {
-      await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
-        totalRides: increment(1),
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
+          totalRides: increment(1),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (pasErr) {
+        console.error("Error updating passenger rides:", pasErr);
+      }
     }
   } catch (error: any) {
     console.error("Error recording cash payment:", error);
@@ -208,6 +242,7 @@ export const recordCardPayment = async (
     const rideSnap = await getDoc(doc(db, Collections.RIDES, rideId));
     const rideData = rideSnap.exists() ? rideSnap.data() : null;
 
+    // Update ride status
     await updateDoc(doc(db, Collections.RIDES, rideId), {
       paymentStatus: "completed",
       paymentMethod: "card",
@@ -216,11 +251,36 @@ export const recordCardPayment = async (
       updatedAt: serverTimestamp(),
     });
 
+    // Create payment document
+    if (rideData) {
+      try {
+        await addDoc(collection(db, Collections.PAYMENTS), {
+          rideId,
+          passengerId: rideData.passengerId ?? null,
+          driverId: rideData.driverId ?? null,
+          amount: rideData.agreedFare ?? 0,
+          paymentMethod: "card",
+          status: "completed",
+          reference,
+          paidAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (payErr) {
+        console.error("Error creating payment document:", payErr);
+      }
+    }
+
+    // Increment passenger total rides
     if (rideData?.passengerId) {
-      await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
-        totalRides: increment(1),
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        await updateDoc(doc(db, Collections.PASSENGERS, rideData.passengerId), {
+          totalRides: increment(1),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (pasErr) {
+        console.error("Error updating passenger rides:", pasErr);
+      }
     }
   } catch (error: any) {
     console.error("Error recording card payment:", error);

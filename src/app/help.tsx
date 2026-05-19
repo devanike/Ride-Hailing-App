@@ -510,7 +510,8 @@ export default function HelpScreen(): React.JSX.Element {
       {activeTab === "chat" && (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80}
         >
           <FlatList
             ref={flatListRef}
